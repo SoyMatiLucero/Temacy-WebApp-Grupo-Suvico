@@ -35,10 +35,10 @@
       cfg: (g && g.cfg) || null,
       disponible: g && g.no && g.fresca ? false : null,     // null = todavía no se sabe
       marco: null, conectado: false, cola: [], focoPendiente: false, estadoMarco: '',
+      enVuelo: null,      // lo último que se le pidió mandar al marco y todavía no confirmó
       ultimo: null,       // el último mensaje de la conversación: { rol, texto, at }
       deEllos: null,      // el último que NO es de la persona: { rol, at, huella }
       caso: '',           // «Derivado al equipo», «Te atiende Ana»: la conversación pasó a una persona
-      asentado: false,    // el marco ya cargó lo que había de antes
       novedad: false, anunciada: false,
       visto: { t: Number(v && v.t) || 0, h: String((v && v.h) || '') },
       dom: {}
@@ -153,6 +153,7 @@
     var linea;
     if (e.disponible === false) linea = 'No disponible por ahora';
     else if (!enLinea && sinChat) linea = 'Sin conexión';
+    else if (e.ultimo && e.ent.reservada) linea = e.ultimo.rol === 'yo' ? 'Escribiste vos' : e.ultimo.rol === 'equipo' ? 'Te contestó una persona del equipo' : 'Te contestaron';
     else if (e.ultimo) linea = (e.ultimo.rol === 'yo' ? 'Vos: ' : '') + e.ultimo.texto;
     else if (C.hayConversacion(e.ent)) linea = 'Seguir la conversación';
     else linea = e.ent.temas;
@@ -290,9 +291,11 @@
   function decir(e, m) {
     if (!e.marco) return;
     m.app = 'grupo';
-    // Antes de que el marco salude todavía no escucha. Lo que la persona pidió mandar se guarda;
-    // lo demás (dónde está parado, el teclado) se le cuenta cuando salude.
-    if (!e.conectado) { if (m.tipo === 'enviar' || m.tipo === 'arranque') e.cola.push(m); return; }
+    var esEnvio = m.tipo === 'enviar' || m.tipo === 'arranque';
+    if (esEnvio) e.enVuelo = m;      // hasta que el marco diga «enviado» o «sin-enviar»
+    // Antes de que el marco salude (o mientras se recarga) no escucha. Lo que la persona pidió
+    // mandar se guarda; lo demás (dónde está parado, el teclado) se le cuenta cuando salude.
+    if (!e.conectado) { if (esEnvio && e.cola.indexOf(m) < 0) e.cola.push(m); return; }
     try { e.marco.contentWindow.postMessage(m, ORIGEN); } catch (err) {}
   }
   // Le cuenta a un marco si es el que se está viendo. Al que se ve se le da el foco sólo en
@@ -318,24 +321,35 @@
     if (m.tipo === 'hola') {            // el marco (re)cargó y ya escucha: se le dice dónde está parado
       // Recién publicada una versión puede cargar un marco nuevo dentro de la app vieja (o al revés).
       // Si no hablan lo mismo, la app se recarga una vez para quedar pareja.
-      if (m.version !== C.VERSION && !sessionStorage.getItem('grupo2_recargada')) {
-        try { sessionStorage.setItem('grupo2_recargada', '1'); } catch (err) {}
-        location.reload();
-        return;
-      }
+      var yaRecargo = true;
+      try { yaRecargo = !!sessionStorage.getItem('grupo2_recargada'); if (m.version !== C.VERSION) sessionStorage.setItem('grupo2_recargada', '1'); } catch (err) {}
+      if (m.version !== C.VERSION && !yaRecargo) { location.reload(); return; }
       e.conectado = true;
       var conFoco = e.focoPendiente;
       e.focoPendiente = false;
       situar(e, conFoco);
       e.cola.splice(0).forEach(function (p) { decir(e, p); });
+    } else if (m.tipo === 'adios') {    // el marco se está recargando: hasta que salude de nuevo no escucha
+      e.conectado = false;
+      // Lo que se le había pedido mandar y no llegó a confirmar se le vuelve a pedir cuando salude.
+      if (e.enVuelo && e.cola.indexOf(e.enVuelo) < 0) e.cola.push(e.enVuelo);
     } else if (m.tipo === 'estado') {
       e.estadoMarco = String(m.estado || '');
       if (m.estado === 'no') { e.disponible = false; e.ultimo = null; e.deEllos = null; e.caso = ''; e.novedad = false; }
-      if (m.estado !== 'listo') e.asentado = false;
       pintar(e);
     } else if (m.tipo === 'mensajes') {
       recibirMensajes(e, m);
+    } else if (m.tipo === 'enviado') {
+      // Recién ahora se sabe que la consulta escrita en el inicio salió: se la marca como enviada.
+      var hecho = e.enVuelo;
+      e.enVuelo = null;
+      if (hecho && hecho.deInicio && hecho.texto === consulta.texto.trim() && consulta.enviadaA.indexOf(e.ent.slug) < 0) {
+        consulta.enviadaA.push(e.ent.slug);
+        recordarConsulta();
+        pintarResultados();
+      }
     } else if (m.tipo === 'sin-enviar') {
+      e.enVuelo = null;
       notar(porQueNoSeEnvio(e, m));
     }
   });
@@ -346,34 +360,34 @@
     e.ultimo = u && typeof u === 'object' ? { rol: rolDe(u.rol), texto: C.texto(String(u.texto || ''), 160), at: Date.parse(u.at) || 0 } : null;
     e.deEllos = d && typeof d === 'object' ? { rol: rolDe(d.rol), at: Date.parse(d.at) || 0, huella: String(d.huella || '').slice(0, 16) } : null;
     e.caso = C.texto(typeof m.caso === 'string' ? m.caso : '', 60);
-    e.asentado = !!m.asentado;
     contarNovedad(e);
-    // Se avisa una vez por novedad, y recién cuando el marco terminó de cargar lo que había de antes.
-    if (e.novedad && e.asentado && !e.anunciada) { e.anunciada = true; anunciar(e); }
+    // Se avisa una sola vez por novedad. (El marco no cuenta nada hasta terminar de traer lo que
+    // había de antes, así que lo que llega acá ya es el estado de verdad.)
+    if (e.novedad && !e.anunciada) { e.anunciada = true; anunciar(e); }
     pintar(e);
   }
 
   /* ── ¿Hay algo nuevo? ─────────────────────────────────────────────────────────────────────────
    *
-   * Se guarda, por entidad, la hora del último mensaje de ellos que la persona ya vio. Hay una
-   * trampa: el chat le pone a cada mensaje la hora del TELÉFONO cuando lo pinta en vivo, y la del
-   * SERVIDOR cuando lo vuelve a traer al recargar. Si el reloj del teléfono atrasa, el mismo
-   * mensaje «vuelve» con una hora posterior a la que se guardó y parecería nuevo. Por eso además
-   * de la hora se guarda una huella del mensaje (no su texto): si el último mensaje es el mismo que
-   * ya se vio y la diferencia es de pocos minutos, no es novedad.
+   * Se guarda, por entidad, una huella de lo último que dijeron ellos y que la persona ya vio (la
+   * huella, no el texto) y la hora de ese mensaje. Hay novedad si lo último que dijeron es OTRA
+   * cosa: se decide por la huella y no por la hora.
+   *
+   * No se puede decidir por la hora porque el chat mezcla dos relojes: a las respuestas del bot les
+   * pone la hora del TELÉFONO cuando las pinta, y a las de una persona del equipo y a todo lo que
+   * vuelve a traer al recargar, la del SERVIDOR. Con el reloj del teléfono adelantado, la respuesta
+   * de una persona podía quedar «antes» de lo ya visto y no avisarse nunca.
+   *
+   * La hora queda sólo para un caso: que vuelvan a decir exactamente lo mismo bastante después.
    */
   function seEstaViendo(e) { return vista === e.ent.slug && document.visibilityState === 'visible'; }
   function contarNovedad(e) {
     var d = e.deEllos;
-    if (seEstaViendo(e)) {
-      var t = Math.max(e.visto.t, d ? d.at : 0, Date.now()), h = d ? d.huella : e.visto.h;
-      if (h !== e.visto.h || t - e.visto.t > 1000) {
-        e.visto = { t: t, h: h };
-        C.guardar('grupo2_visto_' + e.ent.slug, JSON.stringify(e.visto));
-      }
+    if (d && seEstaViendo(e) && (d.huella !== e.visto.h || d.at !== e.visto.t)) {
+      e.visto = { t: d.at, h: d.huella };
+      C.guardar('grupo2_visto_' + e.ent.slug, JSON.stringify(e.visto));
     }
-    var mismo = d && d.huella === e.visto.h && d.at - e.visto.t < 5 * 60000;
-    e.novedad = !!d && d.at > e.visto.t && !mismo;
+    e.novedad = !!d && (d.huella !== e.visto.h || d.at - e.visto.t > 3 * 60000);
     if (!e.novedad) e.anunciada = false;
   }
 
@@ -404,26 +418,39 @@
     pintarPestanas();
     pintarTitulo();
   }
-  // Un toque de la persona. En el teléfono, entrar a un chat desde el inicio apila una entrada en el
-  // historial, así «atrás» vuelve al inicio; pasar de un chat a otro no apila nada.
+  // Un toque de la persona. Entrar a un chat desde el inicio apila una entrada en el historial, así
+  // «atrás» vuelve al inicio; pasar de un chat a otro no apila nada. Se apila igual en pantalla
+  // ancha: un teléfono acostado es «ancho», y al enderezarlo «atrás» tiene que volver al inicio.
   function navegar(v) {
     if (v === vista) return;
-    var apilado = !!(history.state && history.state.apilado);
+    var desde = vista, apilado = !!(history.state && history.state.apilado);
     if (v === 'inicio') {
       if (apilado) { history.back(); return; }      // sigue en `popstate`
       history.replaceState({ v: 'inicio' }, '', './');
-    } else if (vista === 'inicio' && !ANCHA.matches) {
+    } else if (vista === 'inicio') {
       history.pushState({ v: v, apilado: true }, '', '?e=' + v);
     } else {
       history.replaceState({ v: v, apilado: apilado }, '', '?e=' + v);
     }
     mostrar(v, true);
+    acomodarFoco(desde, v);
+  }
+  // En el teléfono, al cambiar de vista lo que tenía el foco queda escondido. Se lo lleva a lo que
+  // se ve ahora: al marco del chat (al marco, no a su campo: eso abriría el teclado) o, al volver,
+  // a la fila de donde se salió. En pantalla ancha el foco va al campo del chat (ver `situar`).
+  function acomodarFoco(desde, hacia) {
+    if (ANCHA.matches) return;
+    var e = hacia === 'inicio' ? porSlug(desde) : porSlug(hacia), destino = null;
+    if (!e) return;
+    if (hacia !== 'inicio') destino = e.marco;
+    else destino = $('portada').hidden ? $('consulta-borrar') : e.dom.fila;
+    try { if (destino) destino.focus({ preventScroll: true }); } catch (err) {}
   }
   function vistaDeLaUrl() {
     var e = C.entidad(new URLSearchParams(location.search).get('e'));
     return e ? e.slug : 'inicio';
   }
-  window.addEventListener('popstate', function () { mostrar(vistaDeLaUrl(), false); });
+  window.addEventListener('popstate', function () { var desde = vista; mostrar(vistaDeLaUrl(), false); acomodarFoco(desde, vista); });
 
   /* ── Mandar algo a un chat ────────────────────────────────────────────────────────────────── */
   function haySalida() {
@@ -435,11 +462,10 @@
   // era para esa entidad, vuelve al inicio y se lo manda a otra sin escribirlo de nuevo.
   function preguntar(e, texto) {
     if (!haySalida()) return;
-    if (consulta.enviadaA.indexOf(e.ent.slug) < 0) consulta.enviadaA.push(e.ent.slug);
-    recordarConsulta();
+    // A una entidad reservada (la obra social) la consulta no queda escrita en el inicio.
+    if (e.ent.reservada) limpiarConsulta();
     navegar(e.ent.slug);
-    decir(e, { tipo: 'enviar', texto: texto });
-    pintarResultados();
+    decir(e, { tipo: 'enviar', texto: texto, deInicio: !e.ent.reservada });   // «enviada» se marca cuando el marco confirma
   }
   // Una pregunta de ejemplo de la entidad (del buscador o de un tema).
   function consultar(e, texto) {
@@ -461,6 +487,7 @@
     if (m.motivo === 'tramite') return 'Tenés un trámite sin terminar con ' + e.ent.nombre + '.' + quedo;
     if (m.motivo === 'pregunta') return e.ent.nombre + ' te hizo una pregunta y espera tu respuesta.' + quedo;
     if (m.motivo === 'borrador') return 'Ya tenías algo escrito en este chat y no lo pisamos. Tu consulta no se mandó.';
+    if (m.motivo === 'fallo' && !m.escrito) return 'No pudimos abrir el chat de ' + e.ent.nombre + '. Tu consulta no se mandó: probá de nuevo.';
     return 'No pudimos mandar tu consulta.' + (m.escrito ? ' Quedó escrita abajo: tocá enviar.' : ' Probá de nuevo.');
   }
 
@@ -646,6 +673,7 @@
   // Una nota de la app (no se pudo mandar, sin conexión…). Se va sola o al tocarla.
   function notar(texto) {
     var n = $('nota-app');
+    $('anuncio').textContent = texto;                // para el lector de pantalla
     n.textContent = texto;
     $('novedad').hidden = true;
     n.hidden = false;
@@ -700,6 +728,7 @@
     function alCambiar() {
       enLinea = navigator.onLine !== false;
       $('sin-red').hidden = enLinea;
+      $('anuncio').textContent = enLinea ? 'Volvió la conexión.' : 'Sin conexión. Vas a poder escribir cuando vuelva.';
       pintarTodo();
       if (enLinea) E.forEach(cargarConfig);
     }
@@ -762,28 +791,50 @@
    * chat, que es lo que permite volver a ver la conversación desde acá. No borra nada en la
    * entidad, y por eso se dice con todas las letras antes de hacerlo.
    */
+  // Suelta, EN ESTA VENTANA, la conversación con una entidad: saca su chat y lo que la app sabía de ella.
+  function soltar(e) {
+    if (e.marco) e.marco.remove();
+    e.marco = null; e.conectado = false; e.cola = []; e.enVuelo = null; e.focoPendiente = false; e.estadoMarco = '';
+    e.ultimo = null; e.deEllos = null; e.caso = ''; e.novedad = false; e.anunciada = false;
+    e.visto = { t: 0, h: '' };
+  }
+  function soltarTodo() {
+    E.forEach(soltar);
+    $('olvidar-caja').hidden = true;
+    consulta = { texto: '', enviadaA: [], situacion: '' };
+    $('consulta-campo').value = '';
+    recordarConsulta();
+    pintarResultados();
+    history.replaceState({ v: 'inicio' }, '', './');
+    mostrar('inicio', false);
+    pintarTodo();
+  }
   function prepararOlvido() {
     var caja = $('olvidar-caja');
     $('olvidar-abrir').addEventListener('click', function () { caja.hidden = !caja.hidden; if (!caja.hidden) $('olvidar-no').focus(); });
     $('olvidar-no').addEventListener('click', function () { caja.hidden = true; $('olvidar-abrir').focus(); });
     $('olvidar-ok').addEventListener('click', function () {
       E.forEach(function (e) {
-        C.borrar('webchat_token_' + e.ent.clave);
+        ['webchat_token_', 'webchat_consent_', 'webchat_origen_'].forEach(function (p) { C.borrar(p + e.ent.clave); });
         C.borrar('grupo2_visto_' + e.ent.slug);
-        if (e.marco) e.marco.remove();
-        e.marco = null; e.conectado = false; e.cola = []; e.focoPendiente = false; e.estadoMarco = '';
-        e.ultimo = null; e.deEllos = null; e.caso = ''; e.asentado = false; e.novedad = false; e.anunciada = false;
-        e.visto = { t: 0, h: '' };
       });
-      caja.hidden = true;
-      consulta = { texto: '', enviadaA: [], situacion: '' };
-      $('consulta-campo').value = '';
-      recordarConsulta();
-      pintarResultados();
-      history.replaceState({ v: 'inicio' }, '', './');
-      mostrar('inicio', false);
-      pintarTodo();
+      C.guardar('grupo2_olvido', String(Date.now()));     // les avisa a las otras ventanas de la app
+      soltarTodo();
       notar('Listo. En este teléfono ya no queda ninguna conversación.');
+    });
+    // La app puede estar abierta en dos ventanas (instalada y en una pestaña). Si en la otra se
+    // borraron las conversaciones, o un chat empezó de nuevo, acá también se sueltan: si no, esta
+    // ventana seguiría mostrando la conversación, y al escribir volvería a guardar su credencial.
+    window.addEventListener('storage', function (ev) {
+      if (ev.key === 'grupo2_olvido') { soltarTodo(); return; }
+      if (!ev.key || ev.newValue !== null || ev.key.indexOf('webchat_token_') !== 0) return;
+      E.forEach(function (e) {
+        if (ev.key !== 'webchat_token_' + e.ent.clave) return;
+        var eraLaVista = vista === e.ent.slug;
+        soltar(e);
+        if (eraLaVista) { history.replaceState({ v: 'inicio' }, '', './'); mostrar('inicio', false); }
+        pintar(e);
+      });
     });
   }
 
@@ -809,7 +860,8 @@
   prepararOlvido();
   pintarPortada();
 
-  history.replaceState({ v: vistaDeLaUrl(), apilado: false }, '', location.href);
+  // Al recargar dentro de un chat al que se entró desde el inicio, el historial conserva esa entrada: se respeta.
+  history.replaceState({ v: vistaDeLaUrl(), apilado: !!(history.state && history.state.apilado) }, '', location.href);
   mostrar(vistaDeLaUrl(), false);
 
   Promise.all(E.map(cargarConfig)).then(function () { setTimeout(precargar, 600); });

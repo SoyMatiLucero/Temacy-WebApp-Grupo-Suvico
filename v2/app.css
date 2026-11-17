@@ -273,7 +273,9 @@ h1 { margin-top: var(--e1); font-size: var(--t-titulo); line-height: 1.15; lette
 /* ── Los chats ────────────────────────────────────────────────────────────────────────────── */
 .charlas { position: relative; background: var(--fondo); }
 .app[data-vista="inicio"] .charlas { visibility: hidden; }
-.marcos { position: absolute; inset: 0; }
+/* Los marcos dejan libre el recorte de la pantalla (el notch con el teléfono acostado): adentro
+   de un marco esas medidas valen cero, así que se dejan acá. Abajo, de eso se ocupan las pestañas. */
+.marcos { position: absolute; top: env(safe-area-inset-top); right: env(safe-area-inset-right); bottom: 0; left: env(safe-area-inset-left); }
 /* Todos los marcos tienen siempre el tamaño completo aunque no se vean: así el chat de adentro
    sigue funcionando (recibe mensajes, mantiene dónde iba la lectura). Se ve uno solo. */
 .marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; background: var(--fondo); }
@@ -361,6 +363,7 @@ h1 { margin-top: var(--e1); font-size: var(--t-titulo); line-height: 1.15; lette
   }
   .vacio p { max-width: 28ch; font-size: var(--t-fila); text-wrap: balance; }
   .pestanas { display: none; }
+  .marcos { left: 0; bottom: env(safe-area-inset-bottom); }   /* sin pestañas, el borde de abajo es del chat; a la izquierda está la columna */
   .globo { left: calc(50% + 196px); }
 }
 

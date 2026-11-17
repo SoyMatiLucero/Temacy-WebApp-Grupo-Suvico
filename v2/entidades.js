@@ -12,6 +12,9 @@
  * «medicamento») y para mandarle la pregunta al chat de la entidad que corresponde. `sit` es en
  * cuál de las `situaciones` del inicio aparece cada una.
  *
+ * `reservada: true` es para la entidad cuyas conversaciones pueden tener datos sensibles: en el
+ * inicio no se muestra el texto de sus mensajes, sólo que hay uno y cuándo llegó.
+ *
  * Ojo: son una copia. Si una entidad cambia las preguntas de su página, hay que cambiarlas acá.
  * Lo ideal a futuro es que cada entidad las cargue como botones de arranque de su chat, que la app
  * ya lee sola.
@@ -86,6 +89,9 @@ window.GRUPO = {
       temas: 'Órdenes, medicamentos, urgencias, centro médico y afiliación.',
       clave: 'wk_ospevic_7e08f0c3382f2f',
       color: '#10C0D0',
+      // Lo que se habla con la obra social puede ser de salud: fuera del chat, la app no muestra
+      // lo que dicen sus mensajes (ni deja escrita la consulta que se le mandó).
+      reservada: true,
       consultas: [
         { sit: 'salud', tema: 'Órdenes y autorizaciones', texto: '¿Cómo pido una orden de consulta?' },
         { sit: 'salud', tema: 'Órdenes y autorizaciones', texto: '¿Cómo autorizo un estudio médico?' },

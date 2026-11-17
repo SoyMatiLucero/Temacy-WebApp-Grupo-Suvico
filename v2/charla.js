@@ -5,8 +5,8 @@
  *
  * Qué hace:
  *   · carga el chat (/widget.js) con la clave de la entidad y lo deja abierto ocupando el marco;
- *   · le cuenta a la app qué pasa (está listo, falló, qué hay en la conversación);
- *   · hace lo que la app pide (mandar una consulta, tocar un botón de arranque);
+ *   · le cuenta a la app qué pasa (está listo, falló, qué hay en la conversación, se va a recargar);
+ *   · hace lo que la app pide (mandar una consulta, tocar un botón de arranque, ponerse al día);
  *   · cuida que un chat que NO se está viendo no moleste: no toma el foco, no habla en voz alta y
  *     no llena la red de pedidos.
  *
@@ -38,7 +38,11 @@
     arranque: '.wcw-ctas .wcw-intent', // los botones de arranque que configuró la entidad
     tramite: '.wcw-gestion',           // un trámite a medio completar
     pregunta: '.wcw-consent-ask:not(.wcw-gestion):not(.wcw-aviso):not(.wcw-reclamo)',   // el chat espera un sí o un no
-    confirmacion: '.wcw-confirm'       // «¿Empezar de nuevo?»
+    // Cualquier cosa que la persona tenga a medias y que una recarga le haría perder: una caja con
+    // campos o botones (trámite, reclamo, aviso por mail, consentimiento), una confirmación, el bot
+    // escribiendo, un archivo subiendo, un audio o un dictado en curso.
+    aMedias: '.wcw-consent-ask, .wcw-confirm, .wcw-typing, .wcw-adj:disabled, .wcw-rec.rec, .wcw-mic.rec',
+    adjuntar: '.wcw-adj, input[type="file"]'
   };
 
   var slug = new URLSearchParams(location.search).get('e');
@@ -47,8 +51,9 @@
   if (!ent || window.parent === window) { location.replace('./' + (ent ? '?e=' + ent.slug : '')); return; }
 
   var ORIGEN = location.origin;
+  var TACTIL = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
   var activo = false;           // ¿es este el chat que la persona está viendo?
-  var listo = false, cerrado = false, panel = null, pendientes = [];
+  var listo = false, cerrado = false, yendose = false, panel = null, pendientes = [];
   var habiaConversacion = C.hayConversacion(ent);
   var red = { config: '', historial: false, tramite: false };   // lo que se sabe por los pedidos del chat
 
@@ -57,6 +62,15 @@
     if (datos) Object.keys(datos).forEach(function (k) { m[k] = datos[k]; });
     window.parent.postMessage(m, ORIGEN);
   }
+  // Recargar este marco, avisándole antes a la app: mientras tanto acá no hay nadie que escuche, y
+  // lo que la app mandara en ese rato se perdería sin que nadie se entere.
+  function recargar() {
+    if (yendose) return;
+    yendose = true;
+    avisar('adios');
+    location.reload();
+  }
+  window.addEventListener('pagehide', function () { if (!yendose) { yendose = true; avisar('adios'); } });
 
   /* ── Un chat que no se está viendo no molesta ─────────────────────────────────────────────────
    *
@@ -65,10 +79,11 @@
    * le sacaba el foco a lo que la persona estaba escribiendo en otro lado (se midió: se cortaba la
    * palabra a la mitad). `inert` en el marco no lo evita. Se resuelve en la fuente: dentro de este
    * documento, pedir el foco por programa sólo funciona si este chat es el que se ve Y el foco ya
-   * está acá adentro (la persona lo está usando). Así el chat sigue manejando su foco como siempre
-   * mientras se lo usa, pero no se lo puede sacar a otra parte de la app ni abrir el teclado del
-   * teléfono con sólo entrar a una conversación. Tocar con el dedo o el mouse no pasa por acá.
-   * Cuando es la app la que quiere el foco en el campo, usa `focoDeFabrica`.
+   * está acá adentro (la persona lo está usando). En el teléfono se pide además que el foco esté
+   * sobre algo del chat y no sólo «en el marco»: si no, con entrar a una conversación se abriría
+   * el teclado. Así el chat sigue manejando su foco como siempre mientras se lo usa, pero no se lo
+   * puede sacar a otra parte de la app. Tocar con el dedo o el mouse no pasa por acá. Cuando es la
+   * app la que quiere el foco en el campo, usa `focoDeFabrica`.
    *
    * VOZ. Si la persona activó «leer las respuestas en voz alta» en un chat y pasó a otro, el
    * primero seguía leyendo lo que le llegaba. Un chat que no se ve no habla.
@@ -76,6 +91,7 @@
   var focoDeFabrica = HTMLElement.prototype.focus;
   HTMLElement.prototype.focus = function () {
     if (!activo || !document.hasFocus()) return;
+    if (TACTIL && (!document.activeElement || document.activeElement === document.body)) return;
     return focoDeFabrica.apply(this, arguments);
   };
   try {
@@ -104,6 +120,8 @@
   var fetchDeFabrica = window.fetch;
   var ultimaLista = null;        // la última respuesta de la consulta de mensajes: { en, status, cuerpo }
   var ultimoCambio = 0;          // cuándo cambió por última vez lo que hay en pantalla
+  var ultimaConsulta = 0;        // cuándo consultó el chat por última vez (de verdad o contestada de la copia)
+  var deLaCopia = false;         // alguna consulta se contestó con lo último que había
   function respuesta(status, cuerpo) { return new Response(cuerpo, { status: status, headers: { 'Content-Type': 'application/json' } }); }
 
   window.fetch = function (recurso, opciones) {
@@ -116,12 +134,16 @@
         var fresca = C.configFresca(ent);
         if (fresca) { red.config = 'ok'; setTimeout(decidir, 0); return Promise.resolve(respuesta(200, JSON.stringify(fresca))); }
       }
-      if (que === 'messages' && metodo === 'GET' && ultimaLista && (!activo || document.hidden)) {
-        var espera = document.hidden ? 60000 : 20000;
-        // Sólo se repite lo último si la pantalla no cambió después por otra vía (un mensaje en vivo):
-        // repetir una lista más vieja que la pantalla haría desaparecer mensajes por un rato.
-        if (Date.now() - ultimaLista.en < espera && ultimoCambio <= ultimaLista.en + 5000) {
-          return Promise.resolve(respuesta(ultimaLista.status, ultimaLista.cuerpo));
+      if (que === 'messages' && metodo === 'GET') {
+        ultimaConsulta = Date.now();
+        if (ultimaLista && (!activo || document.hidden)) {
+          var espera = document.hidden ? 60000 : 20000;
+          // Sólo se repite lo último si la pantalla no cambió después por otra vía (un mensaje en vivo):
+          // repetir una lista más vieja que la pantalla haría desaparecer mensajes por un rato.
+          if (Date.now() - ultimaLista.en < espera && ultimoCambio <= ultimaLista.en + 5000) {
+            deLaCopia = true;
+            return Promise.resolve(respuesta(ultimaLista.status, ultimaLista.cuerpo));
+          }
         }
       }
     } catch (e) { que = ''; }
@@ -129,6 +151,14 @@
     if (que) promesa.then(function (r) { mirar(que, r.status, r.clone()); }, function () { mirar(que, 0, null); });
     return promesa;
   };
+  /* Lo que cuesta espaciar: si en ese hueco llega una respuesta y justo después el chat logra
+   * conectarse en vivo, deja de consultar y NO vuelve a pedir lo que llegó en el medio (es un
+   * defecto del chat, que suelto en una página tiene el mismo hueco, de 4 segundos). Por eso, si a
+   * este chat se le contestó de la copia y después dejó de consultar, se lo recarga: trae todo de
+   * nuevo y no se pierde nada. */
+  setInterval(function () {
+    if (deLaCopia && Date.now() - ultimaConsulta > 9000) { deLaCopia = false; refrescar(); }
+  }, 5000);
 
   function mirar(que, status, copia) {
     try {
@@ -146,17 +176,18 @@
         var en = Date.now();
         return void copia.text().then(function (cuerpo) {
           ultimaLista = { en: en, status: status, cuerpo: cuerpo };
-          if (status !== 200) return;
-          red.historial = true;
-          try { var lista = JSON.parse(cuerpo); if (lista && typeof lista === 'object') red.tramite = !!lista.gestion; } catch (e) {}
+          deLaCopia = false;                 // ésta vino de la red: lo que hay en pantalla está al día
+          red.historial = true;              // con cualquier respuesta: si la credencial venció, no hay nada que esperar
+          if (status === 200) { try { var lista = JSON.parse(cuerpo); if (lista && typeof lista === 'object') red.tramite = !!lista.gestion; } catch (e) {} }
           programarConteo();
         }, function () {});
       }
-      // Mandar un mensaje o avanzar un trámite: ¿quedó un trámite a medias?
-      if (status === 200) copia.json().then(function (b) {
+      // Mandar un mensaje o avanzar un trámite: ¿quedó un trámite a medias? El servidor lo dice de
+      // varias formas según por dónde se llegó (escribiendo o con el formulario del trámite).
+      copia.json().then(function (b) {
         if (!b || typeof b !== 'object') return;
-        if (b.gestion_completa || b.gestion_cancelada) red.tramite = false;
-        else if (b.gestion && typeof b.gestion === 'object') red.tramite = true;
+        if (b.completa || b.ya || b.gestion_completa || b.gestion_cancelada) red.tramite = false;
+        else if (b.gestion || b.paso) red.tramite = true;
       }, function () {});
     } catch (e) {}
   }
@@ -173,9 +204,15 @@
     reintentar.hidden = !conReintento;
     avisar('estado', { estado: estado });
   }
-  function terminar(estado, msj, conReintento) { cerrado = true; clearTimeout(limite); mostrarEstado(estado, msj, conReintento); }
-  reintentar.onclick = function () { location.reload(); };
-  window.addEventListener('online', function () { if (!listo) location.reload(); });
+  // No se pudo abrir el chat. Lo que la app había pedido mandar no se mandó: se lo dice.
+  function terminar(estado, msj, conReintento) {
+    cerrado = true;
+    clearTimeout(limite);
+    mostrarEstado(estado, msj, conReintento);
+    pendientes.splice(0).forEach(function (p) { if (p.envio) avisar('sin-enviar', { motivo: 'fallo', escrito: false }); });
+  }
+  reintentar.onclick = recargar;
+  window.addEventListener('online', function () { if (!listo) recargar(); });
 
   // El color de la entidad, para que el esqueleto de carga ya sea «el de ella».
   var guardada = C.configGuardada(ent);
@@ -234,11 +271,18 @@
       .observe(cuerpo, { childList: true, subtree: true, characterData: true });
     if (cabeza) new MutationObserver(programarConteo)
       .observe(cabeza, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+    // Tocar «adjuntar» abre el selector de archivos o la cámara, que tapan la app un buen rato.
+    panel.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest(SEL.adjuntar)) eligiendoArchivo = Date.now();
+    }, true);
 
     listo = true;
     mostrarEstado('listo');
+    // Si había una conversación, el chat todavía la está trayendo. Si en diez segundos no llegó
+    // (mala señal), se cuenta lo que haya: mejor eso que quedarse callado para siempre.
+    setTimeout(function () { if (!red.historial) { red.historial = true; contar(); } }, 10000);
     contar();
-    pendientes.splice(0).forEach(function (hacer) { hacer(); });
+    pendientes.splice(0).forEach(function (p2) { p2.hacer(); });
   }
 
   /* ── Qué hay en la conversación ───────────────────────────────────────────────────────────────
@@ -246,6 +290,10 @@
    * Se mira cómo QUEDÓ la pantalla, no cada cambio: el chat mueve y vuelve a crear sus mensajes
    * (al cargar el historial los borra todos y los pinta de nuevo), y una respuesta larga del bot
    * sale en varias burbujas que después, en el historial, son una sola.
+   *
+   * Mientras el chat está trayendo una conversación que ya existía no se le cuenta nada a la app:
+   * todavía no está en pantalla, y decir «no hay nada» le haría borrar lo que ya sabía (y avisar
+   * dos veces por el mismo mensaje cuando por fin llega).
    */
   var relojConteo = 0;
   function programarConteo() { clearTimeout(relojConteo); relojConteo = setTimeout(contar, 300); }
@@ -262,9 +310,9 @@
     return /^Te atiende /i.test(t) ? t : '';
   }
   function contar() {
-    if (!listo) return;
+    if (!listo || (habiaConversacion && !red.historial)) return;
     var nodos = panel.querySelectorAll(SEL.cuerpo + ' ' + SEL.mensaje);
-    var ultimo = null, deEllos = null;
+    var ultimo = null, deEllos = null, corrida = '';
     for (var i = 0; i < nodos.length; i++) {
       var n = nodos[i], cl = n.classList;
       if (cl.contains(SEL.bienvenida) || cl.contains(SEL.sistema)) continue;   // el saludo y los avisos no son de nadie
@@ -273,17 +321,24 @@
       var rol = cl.contains(SEL.mio) ? 'yo' : cl.contains(SEL.equipo) ? 'equipo' : 'bot';
       var at = n.getAttribute('data-at') || '';
       ultimo = { rol: rol, texto: t.slice(0, 160), at: at };
-      if (rol !== 'yo') deEllos = { rol: rol, at: at, huella: C.huella(t) };
+      if (rol === 'yo') { corrida = ''; continue; }
+      // La huella se saca de TODO lo que dijeron de corrido, no de la última burbuja: así da lo
+      // mismo que la respuesta esté partida en tres burbujas (en vivo) o venga en una (al recargar).
+      // Y lo que repite el final de lo ya dicho no se suma: cuando el chat no logra conectarse en
+      // vivo, muestra dos veces la misma respuesta (una al recibirla y otra al consultar).
+      var limpio = C.norm(t).replace(/\s+/g, '');
+      if (corrida.slice(-limpio.length) !== limpio) corrida += limpio;
+      deEllos = { rol: rol, at: at, huella: C.huella(corrida) };
     }
-    avisar('mensajes', {
-      ultimo: ultimo, deEllos: deEllos, caso: caso(),
-      // «asentado»: ya se cargó lo que había de antes, así que lo que aparezca desde acá es nuevo.
-      asentado: !habiaConversacion || red.historial
-    });
+    avisar('mensajes', { ultimo: ultimo, deEllos: deEllos, caso: caso() });
   }
 
   /* ── Lo que pide la app ───────────────────────────────────────────────────────────────────── */
-  function cuandoListo(hacer) { if (listo) hacer(); else if (!cerrado) pendientes.push(hacer); }
+  function cuandoListo(hacer, envio) {
+    if (listo) hacer();
+    else if (!cerrado) pendientes.push({ hacer: hacer, envio: !!envio });
+    else if (envio) avisar('sin-enviar', { motivo: 'fallo', escrito: false });
+  }
 
   // Mandar un texto escrito fuera del chat es delicado: si hay un trámite a medias, el servidor lo
   // toma como la respuesta al paso pendiente. En ese caso (y si el chat está esperando un sí o un
@@ -302,6 +357,7 @@
     avisar('sin-enviar', { motivo: motivo, escrito: escrito });
   }
   function mandar(texto, vuelta) {
+    if (yendose) return;
     var campo = panel.querySelector(SEL.campo), boton = panel.querySelector(SEL.enviar);
     if (!campo || !boton) return noEnviado(texto, 'fallo');
     var motivo = traba();
@@ -320,6 +376,7 @@
   // trámite que corresponda). Si no —la conversación ya empezó y el chat los sacó— se manda su
   // texto, que es lo mismo que hace el chat en el primer contacto.
   function tocarArranque(etiqueta, texto, vuelta) {
+    if (yendose) return;
     var botones = panel.querySelectorAll(SEL.arranque);
     for (var i = 0; i < botones.length; i++) {
       if (C.texto(botones[i].textContent, 60) === etiqueta && botones[i].offsetParent !== null) { botones[i].click(); return avisar('enviado'); }
@@ -330,14 +387,25 @@
     }
     mandar(texto);
   }
-  // Al volver a la app después de un rato: el chat no vuelve a pedir lo que llegó mientras estaba
-  // desconectado, así que se lo recarga. Sólo si no se pierde nada que la persona tenía a medias.
-  function refrescar() {
-    if (!listo) return;
+
+  /* Ponerse al día: al volver a la app después de un rato, o cuando hubo consultas contestadas de
+   * la copia. El chat no vuelve a pedir lo que llegó mientras estaba desconectado, así que se lo
+   * recarga. NUNCA si la persona tiene algo a medias, porque el chat, al recargar, no lo vuelve a
+   * dibujar: un formulario de reclamo a medio llenar, un archivo subiendo, un audio grabándose, el
+   * selector de archivos o la cámara abiertos (por eso se recuerda cuándo tocó «adjuntar»). */
+  var eligiendoArchivo = 0;
+  function aMedias() {
     var campo = panel.querySelector(SEL.campo), boton = panel.querySelector(SEL.enviar);
-    if (!C.hayConversacion(ent) || (campo && campo.value.trim()) || (boton && boton.disabled)) return;
-    if (panel.querySelector(SEL.tramite) || panel.querySelector(SEL.pregunta) || panel.querySelector(SEL.confirmacion)) return;
-    location.reload();
+    if ((campo && campo.value.trim()) || (boton && boton.disabled)) return true;
+    if (panel.querySelector(SEL.aMedias)) return true;
+    if (Date.now() - eligiendoArchivo < 5 * 60000) return true;
+    var campos = panel.querySelectorAll('input:not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="hidden"]), textarea, select');
+    for (var i = 0; i < campos.length; i++) if (String(campos[i].value || '').trim()) return true;
+    return false;
+  }
+  function refrescar() {
+    if (!listo || yendose || !C.hayConversacion(ent) || aMedias()) return;
+    recargar();
   }
 
   // La app pide el foco en el campo (pantalla ancha, al elegir una conversación). Recién abierto,
@@ -351,7 +419,7 @@
   }
 
   window.addEventListener('message', function (e) {
-    if (e.origin !== ORIGEN || e.source !== window.parent) return;
+    if (e.origin !== ORIGEN || e.source !== window.parent || yendose) return;
     var m = e.data;
     if (!m || m.app !== 'grupo') return;
     if (m.tipo === 'activar') {
@@ -362,10 +430,10 @@
       document.documentElement.classList.toggle('teclado', !!m.abierto);
     } else if (m.tipo === 'enviar' && typeof m.texto === 'string') {
       var t = C.texto(m.texto, 2000);
-      if (t) cuandoListo(function () { mandar(t); });
+      if (t) cuandoListo(function () { mandar(t); }, true);
     } else if (m.tipo === 'arranque' && typeof m.etiqueta === 'string') {
       var etiqueta = C.texto(m.etiqueta, 60), texto = C.texto(typeof m.texto === 'string' ? m.texto : '', 200) || etiqueta;
-      if (etiqueta) cuandoListo(function () { tocarArranque(etiqueta, texto); });
+      if (etiqueta) cuandoListo(function () { tocarArranque(etiqueta, texto); }, true);
     } else if (m.tipo === 'refrescar') {
       refrescar();
     }

@@ -25,7 +25,7 @@
   -->
   <div id="app" class="app" data-vista="inicio">
 
-    <p id="sin-red" class="aviso-red" role="status" hidden>Sin conexión. Vas a poder escribir cuando vuelva.</p>
+    <p id="sin-red" class="aviso-red" hidden>Sin conexión. Vas a poder escribir cuando vuelva.</p>
 
     <aside id="inicio" class="inicio" aria-label="Inicio">
       <header class="cabecera">
@@ -107,9 +107,11 @@
 
     <nav id="pestanas" class="pestanas" aria-label="Secciones"></nav>
 
-    <!-- Avisos que aparecen arriba un momento: «te contestaron» (se toca para ir) y notas de la app -->
+    <!-- Avisos que aparecen arriba un momento: «te contestaron» (se toca para ir) y notas de la app.
+         Al lector de pantalla se le dicen por #anuncio, que está siempre presente: un aviso que
+         aparece ya escrito (de oculto a visible) hay lectores que no lo anuncian. -->
     <button id="novedad" class="globo" type="button" hidden></button>
-    <p id="nota-app" class="globo nota-app" role="status" hidden></p>
+    <p id="nota-app" class="globo nota-app" hidden></p>
     <p id="anuncio" class="solo-lector" role="status" aria-live="polite"></p>
   </div>
 

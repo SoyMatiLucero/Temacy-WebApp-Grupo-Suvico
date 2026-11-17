@@ -39,10 +39,10 @@ window.Comun = (function () {
     });
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.21 ? '#16202b' : '#ffffff';
   }
-  // Una huella corta del final de un texto. Sirve para reconocer «es el mismo mensaje que ya vi»
-  // sin guardar en el teléfono lo que dice el mensaje.
+  // Una huella de un texto. Sirve para reconocer «es lo mismo que ya vi» sin guardar en el teléfono
+  // lo que dice. Se saca sin espacios, para que dé igual cómo venga cortado el texto.
   function huella(s) {
-    var t = norm(s).replace(/\s+/g, ' ').trim().slice(-40), h = 2166136261;
+    var t = norm(s).replace(/\s+/g, ''), h = 2166136261;
     for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = (h * 16777619) >>> 0; }
     return h.toString(36);
   }
@@ -83,7 +83,9 @@ window.Comun = (function () {
 
   function resumir(cruda) {
     var b = (cruda && cruda.branding) || {};
-    return { bot: texto(cruda && cruda.nombre, 40), color: color(b.color), logo: logo(b.logo), intenciones: intenciones(cruda && cruda.intenciones) };
+    // El nombre, en el mismo orden que usa el chat para su encabezado: el del asesor si lo cargaron, si no el del bot.
+    var nombre = (cruda && cruda.asesor && cruda.asesor.nombre) || (cruda && cruda.nombre);
+    return { bot: texto(nombre, 40), color: color(b.color), logo: logo(b.logo), intenciones: intenciones(cruda && cruda.intenciones) };
   }
   // Lo último que se supo de la configuración de una entidad: { cfg, no, fresca } o null.
   function configGuardada(ent) {

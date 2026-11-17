@@ -10,6 +10,9 @@
  * vieja), y con señal mala no hay que esperar a que un pedido se venza para ver la app.
  *
  * Consecuencia: un cambio publicado se ve la SEGUNDA vez que se abre la app, no la primera.
+ * Y otra, a cuidar al publicar: si falta UNO solo de los archivos de la lista, la copia no se
+ * actualiza y los teléfonos se quedan con la versión anterior sin avisar. El guion de publicación
+ * tiene que comprobar que estén todos.
  *
  * Al sumar un archivo a la app hay que sumarlo a ARCHIVOS, o no va a estar sin conexión.
  */
@@ -54,16 +57,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Los logos de las entidades que sirve este mismo sitio: guardados, se ven también sin conexión.
-  if (url.pathname.startsWith('/brands/')) {
-    e.respondWith(caches.open(COPIA).then((copia) => copia.match(req).then((guardado) => guardado || fetch(req).then((res) => {
-      if (res.ok) copia.put(req, res.clone());
-      return res;
-    }))));
-    return;
-  }
-
-  // Sólo los archivos de la app. Todo lo demás (/api, /widget.js, /socket.io, /uploads…) no se toca.
+  // Sólo los archivos de la app, que son siempre los mismos y vienen de este sitio. Todo lo demás
+  // (/api, /widget.js, /socket.io, logos, adjuntos) no se toca ni se guarda: en la copia no entra
+  // nada que haya subido o escrito alguien.
   if (!RUTAS.has(url.pathname)) return;
   if (Date.now() - ultimaVez > CADA_MS) { ultimaVez = Date.now(); e.waitUntil(ponerAlDia()); }
   // La página es la misma con cualquier parámetro (./?e=suvico, charla.html?e=…): se busca por su ruta.
