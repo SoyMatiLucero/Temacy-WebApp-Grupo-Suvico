@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#f6f3ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#100e0a" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Afiliados">
+  <title>Atención al afiliado</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!--
+    La app: una sola página con el inicio y los chats.
+      · en teléfono se ve una cosa por vez (el inicio o un chat) y abajo van las pestañas;
+      · en pantalla ancha, el inicio queda como columna a la izquierda y el chat a la derecha.
+    Cada chat vive en su propio marco (charla.html) y sigue vivo aunque no se esté viendo.
+  -->
+  <div id="app" class="app" data-vista="inicio">
+
+    <p id="sin-red" class="aviso-red" role="status" hidden>Sin conexión. Vas a poder escribir cuando vuelva.</p>
+
+    <aside id="inicio" class="inicio" aria-label="Inicio">
+      <header class="cabecera">
+        <p class="app-nombre" data-app-nombre></p>
+        <h1>¿Qué necesitás?</h1>
+      </header>
+
+      <form id="consulta" class="consulta" role="search" autocomplete="off">
+        <label for="consulta-campo" class="solo-lector">Escribí tu consulta</label>
+        <svg class="consulta-lupa" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="consulta-campo" type="text" inputmode="text" enterkeyhint="search" maxlength="500" placeholder="Escribí tu consulta">
+        <button id="consulta-borrar" class="consulta-borrar" type="button" aria-label="Borrar y volver al inicio" hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        </button>
+      </form>
+
+      <!-- Con algo escrito o un tema elegido: las preguntas que coinciden y a quién mandarle la consulta -->
+      <div id="resultados" class="resultados" hidden>
+        <section id="res-temas" hidden>
+          <h2 id="res-temas-rotulo" class="rotulo">Temas</h2>
+          <ul id="res-temas-lista" class="filas"></ul>
+        </section>
+        <section id="res-enviar" hidden>
+          <h2 id="res-enviar-rotulo" class="rotulo">Mandarle tu consulta a</h2>
+          <ul id="res-enviar-lista" class="filas"></ul>
+          <p class="nota">Sólo viaja lo que escribiste acá. Nada de lo que hablaste con uno pasa a otro.</p>
+        </section>
+        <p id="res-corta" class="nota" hidden>Seguí escribiendo y elegí a quién mandársela.</p>
+      </div>
+
+      <!-- Sin nada escrito: las conversaciones y los temas -->
+      <div id="portada">
+        <section aria-labelledby="conv-rotulo">
+          <h2 id="conv-rotulo" class="rotulo">Con quién hablar</h2>
+          <ul id="conversaciones" class="filas"></ul>
+          <p id="conv-nota" class="nota chica" hidden>Te avisamos de las respuestas mientras tengas la app abierta. Con la app cerrada no podemos avisarte.</p>
+        </section>
+
+        <section id="pedidos" aria-labelledby="pedidos-rotulo" hidden>
+          <h2 id="pedidos-rotulo" class="rotulo">Lo más pedido</h2>
+          <div id="pedidos-lista" class="temas-lista"></div>
+        </section>
+
+        <section id="situaciones" aria-labelledby="situaciones-rotulo" hidden>
+          <h2 id="situaciones-rotulo" class="rotulo">Por tema</h2>
+          <ul id="situaciones-lista" class="filas"></ul>
+        </section>
+
+        <p class="nota">Lo que hablás con el sindicato, la mutual o la obra social queda sólo ahí: no se comparte entre ellos.</p>
+
+        <div id="instalar" class="caja" hidden>
+          <p id="instalar-texto"></p>
+          <div class="caja-acciones">
+            <button id="instalar-ok" class="boton" type="button" hidden>Instalar</button>
+            <button id="instalar-no" class="boton-llano" type="button">Ahora no</button>
+          </div>
+        </div>
+
+        <div id="olvidar" class="olvidar" hidden>
+          <button id="olvidar-abrir" class="boton-llano" type="button">Borrar mis conversaciones de este teléfono</button>
+          <div id="olvidar-caja" class="caja" hidden>
+            <p>Vas a dejar de ver tus conversaciones en este teléfono. Lo que escribiste lo conservan el sindicato, la mutual y la obra social. Si estabas esperando una respuesta, no la vas a poder leer acá.</p>
+            <div class="caja-acciones">
+              <button id="olvidar-ok" class="boton" type="button">Borrar</button>
+              <button id="olvidar-no" class="boton-llano" type="button">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main id="contenido" class="charlas" aria-label="Conversación">
+      <div id="vacio" class="vacio">
+        <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><path d="M14 16h36a6 6 0 0 1 6 6v18a6 6 0 0 1-6 6H31l-11 9v-9h-6a6 6 0 0 1-6-6V22a6 6 0 0 1 6-6z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
+        <p>Elegí con quién hablar o escribí tu consulta.</p>
+      </div>
+      <div id="marcos" class="marcos"></div>
+    </main>
+
+    <nav id="pestanas" class="pestanas" aria-label="Secciones"></nav>
+
+    <!-- Avisos que aparecen arriba un momento: «te contestaron» (se toca para ir) y notas de la app -->
+    <button id="novedad" class="globo" type="button" hidden></button>
+    <p id="nota-app" class="globo nota-app" role="status" hidden></p>
+    <p id="anuncio" class="solo-lector" role="status" aria-live="polite"></p>
+  </div>
+
+  <noscript><p class="sin-js">Esta app necesita JavaScript para abrir los chats.</p></noscript>
+
+  <script src="entidades.js"></script>
+  <script src="comun.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

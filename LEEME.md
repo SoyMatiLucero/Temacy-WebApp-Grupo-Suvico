@@ -19,6 +19,6 @@ API=http://127.0.0.1:3110 node web_grupo/servidor-local.js
 
 - v1: `http://127.0.0.1:4510`
 - v2: `http://127.0.0.1:4520`
-- las dos lado a lado: `http://127.0.0.1:4500`
+- las dos lado a lado: `http://127.0.0.1:4505`
 
 `servidor-local.js` y `comparar.html` son herramientas de trabajo: no se publican.

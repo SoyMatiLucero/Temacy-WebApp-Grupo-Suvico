@@ -5,7 +5,7 @@
  * almacenamiento y su service worker, como si fueran dos sitios distintos— y una página para verlas
  * lado a lado:
  *
- *   node web_grupo/servidor-local.js        → v1 en :4510 · v2 en :4520 · comparador en :4500
+ *   node web_grupo/servidor-local.js        → v1 en :4510 · v2 en :4520 · lado a lado en :4505
  *   node web_grupo/servidor-local.js v2     → sólo esa versión
  *   API=http://127.0.0.1:3110 node …        → otra API (por defecto http://127.0.0.1:3100)
  *   RED=1 node …                            → escucha también en la red local, para abrirla desde un
@@ -26,7 +26,7 @@ const path = require('path');
 const API = new URL(process.env.API || 'http://127.0.0.1:3100');
 const ESCUCHA = process.env.RED === '1' ? '0.0.0.0' : '127.0.0.1';
 const BASE = __dirname;
-const PUERTO_COMPARADOR = 4500;
+const PUERTO_COMPARADOR = 4505;
 const puertoDe = (version) => 4500 + 10 * Number(version.slice(1));   // v1 → 4510, v2 → 4520…
 
 // SÓLO lo que el chat necesita, que es lo mismo que tiene que reenviar nginx en el subdominio (ver
@@ -78,6 +78,12 @@ function aLaApi(req, res) {
   req.pipe(salida);
 }
 
+// Un puerto ocupado por otro programa no puede tirar abajo a los demás: se avisa y se sigue.
+function escuchar(servidor, puerto, nombre) {
+  servidor.on('error', (e) => console.error(`  ${nombre}: no se pudo abrir el puerto ${puerto} (${e.code === 'EADDRINUSE' ? 'lo está usando otro programa' : e.message})`));
+  servidor.listen(puerto, ESCUCHA, () => console.log(`  ${nombre}: http://127.0.0.1:${puerto}`));
+}
+
 function levantarVersion(version) {
   const raiz = path.join(BASE, version);
   const servidor = http.createServer((req, res) => {
@@ -100,12 +106,12 @@ function levantarVersion(version) {
     api.on('error', () => socket.destroy());
     socket.on('error', () => api.destroy());
   });
-  servidor.listen(puertoDe(version), ESCUCHA, () => console.log(`  ${version}: http://127.0.0.1:${puertoDe(version)}`));
+  escuchar(servidor, puertoDe(version), version);
 }
 
 // La página que muestra las versiones lado a lado. Sabe qué versiones hay por /versiones.js.
 function levantarComparador(versiones) {
-  http.createServer((req, res) => {
+  const comparador = http.createServer((req, res) => {
     const ruta = rutaDe(req.url);
     if (ruta === '/versiones.js') {
       res.writeHead(200, { 'Content-Type': TIPOS['.js'], 'Cache-Control': 'no-cache' });
@@ -113,7 +119,8 @@ function levantarComparador(versiones) {
     }
     if (ruta !== '/') { res.writeHead(404); return res.end(); }
     servirArchivo(path.join(BASE, 'comparar.html'), res);
-  }).listen(PUERTO_COMPARADOR, ESCUCHA, () => console.log(`  lado a lado: http://127.0.0.1:${PUERTO_COMPARADOR}`));
+  });
+  escuchar(comparador, PUERTO_COMPARADOR, 'lado a lado');
 }
 
 const todas = fs.readdirSync(BASE).filter((d) => /^v\d+$/.test(d) && fs.existsSync(path.join(BASE, d, 'index.html'))).sort();

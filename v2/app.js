@@ -1,0 +1,820 @@
+/*
+ * Web app del grupo, versión 2 — la app.
+ *
+ * Una sola página con el inicio y los chats:
+ *   ./            → inicio: escribir una consulta, elegir un tema o una conversación
+ *   ./?e=<slug>   → el chat de esa entidad
+ *
+ * Cada chat vive en su propio marco (charla.html), que se crea la primera vez que hace falta y
+ * después queda vivo aunque no se vea. Por eso pasar de un chat a otro es instantáneo y la app
+ * puede avisar «te contestaron» de una conversación que no se está mirando.
+ *
+ * La app y los marcos se hablan con mensajes (postMessage, mismo origen):
+ *   marco → app:  hola · estado (cargando|listo|no|sinred|fallo) · mensajes · enviado · sin-enviar
+ *   app → marco:  activar · teclado · enviar (una consulta) · arranque (un botón del chat) · refrescar
+ *
+ * La app nunca lee ni copia lo que se habló con una entidad para llevarlo a otra: lo único que
+ * viaja es lo que la persona escribe en el campo del inicio, y adonde ella lo manda.
+ */
+(function () {
+  'use strict';
+
+  var C = window.Comun, G = C.grupo, ORIGEN = location.origin;
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $('app');
+  var ANCHA = window.matchMedia('(min-width: 860px)');   // pantalla ancha: inicio y chat lado a lado
+  // Cada conversación que nace acá va marcada, para que se pueda saber que llegó por la app.
+  // (Hoy la plataforma no guarda esa marca para estas tres entidades: ver LEEME.)
+  var PROCEDENCIA = '&utm_source=app_grupo&utm_medium=pwa';
+
+  /* ── Estado ───────────────────────────────────────────────────────────────────────────────── */
+  var E = G.entidades.map(function (ent) {
+    var g = C.configGuardada(ent), v = C.leerJSON('grupo2_visto_' + ent.slug);
+    return {
+      ent: ent,
+      cfg: (g && g.cfg) || null,
+      disponible: g && g.no && g.fresca ? false : null,     // null = todavía no se sabe
+      marco: null, conectado: false, cola: [], focoPendiente: false, estadoMarco: '',
+      ultimo: null,       // el último mensaje de la conversación: { rol, texto, at }
+      deEllos: null,      // el último que NO es de la persona: { rol, at, huella }
+      caso: '',           // «Derivado al equipo», «Te atiende Ana»: la conversación pasó a una persona
+      asentado: false,    // el marco ya cargó lo que había de antes
+      novedad: false, anunciada: false,
+      visto: { t: Number(v && v.t) || 0, h: String((v && v.h) || '') },
+      dom: {}
+    };
+  });
+  var vista = 'inicio';
+  var teclado = false;
+  var enLinea = navigator.onLine !== false;
+  var consulta = { texto: '', enviadaA: [], situacion: '' };
+
+  function porSlug(slug) { for (var i = 0; i < E.length; i++) if (E[i].ent.slug === slug) return E[i]; return null; }
+  function algunaConversacion() { return E.some(function (e) { return C.hayConversacion(e.ent); }); }
+  function el(etiqueta, clase, texto) {
+    var n = document.createElement(etiqueta);
+    if (clase) n.className = clase;
+    if (texto != null) n.textContent = texto;
+    return n;
+  }
+  function svg(d, lado) {
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', lado || 22); s.setAttribute('height', lado || 22); s.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '2');
+    p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+    s.appendChild(p);
+    return s;
+  }
+  var FLECHA = 'M9 5l7 7-7 7', CASA = 'M4 11l8-7 8 7M6 10v9h12v-9', AVION = 'M4 12l16-7-6 16-3-7-7-2z';
+  function flecha(d) { var f = el('span', 'fila-flecha'); f.appendChild(svg(d || FLECHA)); return f; }
+  function enumerar(nombres) {
+    return nombres.length < 2 ? nombres.join('') : nombres.slice(0, -1).join(', ') + ' y ' + nombres[nombres.length - 1];
+  }
+
+  // El logo de la entidad (o su inicial) y su color.
+  function ponerAvatar(nodo, e) {
+    var c = (e.cfg && e.cfg.color) || e.ent.color;
+    nodo.style.setProperty('--marca', c);
+    nodo.style.setProperty('--marca-tinta', C.tintaSobre(c));
+    var logo = (e.cfg && e.cfg.logo) || '';
+    if (nodo.getAttribute('data-logo') === logo) return;
+    nodo.setAttribute('data-logo', logo);
+    nodo.textContent = '';
+    nodo.classList.toggle('con-logo', !!logo);
+    if (!logo) { nodo.textContent = e.ent.nombre.charAt(0); return; }
+    var img = new Image();
+    img.alt = '';
+    img.onerror = function () { nodo.textContent = e.ent.nombre.charAt(0); nodo.classList.remove('con-logo'); };
+    img.src = logo;
+    nodo.appendChild(img);
+  }
+  function avatar(e, clase) {
+    var n = el('span', 'avatar' + (clase ? ' ' + clase : ''));
+    n.setAttribute('aria-hidden', 'true');
+    ponerAvatar(n, e);
+    return n;
+  }
+  // «SUVICO · Tu sueldo», con el logo chiquito adelante: de quién es una pregunta.
+  function deQuien(e, detalle) {
+    var n = el('span', 'fila-previa');
+    n.appendChild(avatar(e, 'minimo'));
+    n.appendChild(el('span', null, e.ent.nombre + ' · ' + detalle));
+    return n;
+  }
+
+  function hora(ms) {
+    var d = new Date(ms), hoy = new Date(), ayer = new Date(hoy);
+    ayer.setDate(hoy.getDate() - 1);
+    if (d.toDateString() === hoy.toDateString()) return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    if (d.toDateString() === ayer.toDateString()) return 'ayer';
+    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  }
+  // El punto de «hay algo nuevo», con su frase para el lector de pantalla.
+  function ponerPunto(caja, si) {
+    caja.textContent = '';
+    if (!si) return;
+    var p = el('span', 'punto');
+    p.setAttribute('aria-hidden', 'true');
+    caja.appendChild(p);
+    caja.appendChild(el('span', 'solo-lector', 'Mensaje nuevo'));
+  }
+
+  /* ── Inicio: las conversaciones ───────────────────────────────────────────────────────────── */
+  function armarConversaciones() {
+    var ul = $('conversaciones');
+    E.forEach(function (e) {
+      var li = el('li'), a = el('a', 'fila');
+      a.addEventListener('click', function (ev) {
+        if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button) return;   // abrir en otra pestaña: que funcione
+        ev.preventDefault();
+        if (a.getAttribute('aria-disabled') !== 'true') navegar(e.ent.slug);
+      });
+      var av = avatar(e);
+      var txt = el('span', 'fila-texto'), nombre = el('span', 'fila-nombre'), que = el('span', 'fila-que'), previa = el('span', 'fila-previa');
+      nombre.appendChild(el('span', null, e.ent.nombre));
+      nombre.appendChild(que);
+      txt.appendChild(nombre); txt.appendChild(previa);
+      var meta = el('span', 'fila-meta'), cuando = el('span'), punto = el('span'), fl = flecha();
+      meta.appendChild(cuando); meta.appendChild(punto); meta.appendChild(fl);
+      a.appendChild(av); a.appendChild(txt); a.appendChild(meta);
+      li.appendChild(a); ul.appendChild(li);
+      e.dom.fila = a; e.dom.avatar = av; e.dom.que = que; e.dom.previa = previa; e.dom.cuando = cuando; e.dom.punto = punto; e.dom.flecha = fl;
+      pintarFila(e);
+    });
+  }
+
+  function pintarFila(e) {
+    var d = e.dom;
+    var sinChat = !e.marco || e.estadoMarco !== 'listo';       // sin conexión sólo sirve un chat que ya estaba abierto
+    var apagada = e.disponible === false || (!enLinea && sinChat);
+    ponerAvatar(d.avatar, e);
+    d.que.textContent = e.caso || e.ent.que;
+    var linea;
+    if (e.disponible === false) linea = 'No disponible por ahora';
+    else if (!enLinea && sinChat) linea = 'Sin conexión';
+    else if (e.ultimo) linea = (e.ultimo.rol === 'yo' ? 'Vos: ' : '') + e.ultimo.texto;
+    else if (C.hayConversacion(e.ent)) linea = 'Seguir la conversación';
+    else linea = e.ent.temas;
+    d.previa.textContent = linea;
+    d.cuando.textContent = e.ultimo && e.ultimo.at && !apagada ? hora(e.ultimo.at) : '';
+    ponerPunto(d.punto, e.novedad);
+    d.flecha.hidden = e.novedad || apagada;
+    d.fila.classList.toggle('con-novedad', e.novedad);
+    if (apagada) { d.fila.setAttribute('aria-disabled', 'true'); d.fila.removeAttribute('href'); }
+    else { d.fila.removeAttribute('aria-disabled'); d.fila.href = '?e=' + e.ent.slug; }
+    if (vista === e.ent.slug) d.fila.setAttribute('aria-current', 'true'); else d.fila.removeAttribute('aria-current');
+  }
+
+  /* ── Inicio: lo más pedido y los temas ────────────────────────────────────────────────────── */
+  // «Lo más pedido» son los botones de arranque que cada entidad ya tiene en su chat. Se rehacen
+  // sólo si cambiaron: rehacerlos con cada mensaje le sacaría el foco a quien navega con teclado.
+  var firmaPedidos = null;
+  function pintarPedidos() {
+    var items = [];
+    E.forEach(function (e) {
+      if (e.disponible === false || !e.cfg) return;
+      e.cfg.intenciones.slice(0, 4).forEach(function (i) { items.push({ e: e, i: i }); });   // hasta cuatro por entidad: que ninguna tape a las otras
+    });
+    var firma = JSON.stringify(items.map(function (x) { return [x.e.ent.slug, x.i.etiqueta, x.e.cfg.logo, x.e.cfg.color]; }));
+    if (firma === firmaPedidos) return;
+    firmaPedidos = firma;
+    var cont = $('pedidos-lista');
+    cont.textContent = '';
+    items.forEach(function (x) {
+      var b = el('button', 'tema');
+      b.type = 'button';
+      b.appendChild(avatar(x.e, 'minimo'));
+      b.appendChild(el('span', null, x.i.etiqueta));
+      b.appendChild(el('span', 'solo-lector', ', ' + x.e.ent.nombre));
+      b.addEventListener('click', function () { arrancar(x.e, x.i); });
+      cont.appendChild(b);
+    });
+    $('pedidos').hidden = !items.length;
+  }
+
+  // «Por tema»: las situaciones de entidades.js que tengan alguna pregunta de una entidad disponible.
+  var firmaSituaciones = null;
+  function pintarSituaciones() {
+    var filas = (G.situaciones || []).map(function (s) {
+      return { s: s, quienes: E.filter(function (e) { return e.disponible !== false && (e.ent.consultas || []).some(function (c) { return c.sit === s.id; }); }) };
+    }).filter(function (x) { return x.quienes.length; });
+    var firma = JSON.stringify(filas.map(function (x) { return [x.s.id, x.quienes.map(function (e) { return e.ent.slug; })]; }));
+    if (firma === firmaSituaciones) return;
+    firmaSituaciones = firma;
+    var ul = $('situaciones-lista');
+    ul.textContent = '';
+    filas.forEach(function (x) {
+      var li = el('li'), b = el('button', 'fila fila-situacion');
+      b.type = 'button';
+      var txt = el('span', 'fila-texto');
+      txt.appendChild(el('span', 'fila-nombre', x.s.nombre));
+      txt.appendChild(el('span', 'fila-previa', enumerar(x.quienes.map(function (e) { return e.ent.nombre; }))));
+      b.appendChild(txt); b.appendChild(flecha());
+      b.addEventListener('click', function () { abrirSituacion(x.s.id); });
+      li.appendChild(b); ul.appendChild(li);
+    });
+    $('situaciones').hidden = !filas.length;
+  }
+
+  function pintarPortada() {
+    var alguna = algunaConversacion();
+    $('conv-rotulo').textContent = alguna ? 'Tus conversaciones' : 'Con quién hablar';
+    $('conv-nota').hidden = !alguna;
+    $('olvidar').hidden = !alguna;
+    if (!alguna) $('olvidar-caja').hidden = true;
+    ofrecerInstalar();
+  }
+
+  /* ── Pestañas (teléfono) ──────────────────────────────────────────────────────────────────── */
+  var pestanaInicio = null;
+  function armarPestanas() {
+    var nav = $('pestanas');
+    pestanaInicio = el('a', 'pestana');
+    pestanaInicio.href = './';
+    var ico = el('span', 'icono'); ico.appendChild(svg(CASA, 24));
+    pestanaInicio.appendChild(ico); pestanaInicio.appendChild(el('span', 'nombre', 'Inicio'));
+    pestanaInicio.addEventListener('click', function (ev) { ev.preventDefault(); navegar('inicio'); });
+    nav.appendChild(pestanaInicio);
+    E.forEach(function (e) {
+      var a = el('a', 'pestana'), icono = el('span', 'icono'), av = avatar(e, 'chico'), punto = el('span');
+      icono.appendChild(av);
+      a.appendChild(icono); a.appendChild(el('span', 'nombre', e.ent.nombre)); a.appendChild(punto);
+      a.addEventListener('click', function (ev) { ev.preventDefault(); if (a.getAttribute('aria-disabled') !== 'true') navegar(e.ent.slug); });
+      nav.appendChild(a);
+      e.dom.pestana = a; e.dom.pestanaAvatar = av; e.dom.pestanaPunto = punto;
+    });
+    pintarPestanas();
+  }
+  function pintarPestanas() {
+    if (vista === 'inicio') pestanaInicio.setAttribute('aria-current', 'page'); else pestanaInicio.removeAttribute('aria-current');
+    E.forEach(function (e) {
+      var d = e.dom, apagada = e.disponible === false || (!enLinea && (!e.marco || e.estadoMarco !== 'listo'));
+      ponerAvatar(d.pestanaAvatar, e);
+      d.pestana.style.setProperty('--marca', (e.cfg && e.cfg.color) || e.ent.color);
+      if (vista === e.ent.slug) d.pestana.setAttribute('aria-current', 'page'); else d.pestana.removeAttribute('aria-current');
+      if (apagada) { d.pestana.setAttribute('aria-disabled', 'true'); d.pestana.removeAttribute('href'); }
+      else { d.pestana.removeAttribute('aria-disabled'); d.pestana.href = '?e=' + e.ent.slug; }
+      ponerPunto(d.pestanaPunto, e.novedad);
+    });
+  }
+
+  // Cuántas conversaciones tienen algo nuevo: en el título de la pestaña y en el ícono de la app instalada.
+  function pintarTitulo() {
+    var total = E.filter(function (e) { return e.novedad; }).length;
+    var actual = vista === 'inicio' ? null : porSlug(vista);
+    document.title = (total ? '(' + total + ') ' : '') + (actual ? actual.ent.nombre + ' · ' : '') + G.nombre;
+    try {
+      if (total && navigator.setAppBadge) navigator.setAppBadge(total);
+      else if (!total && navigator.clearAppBadge) navigator.clearAppBadge();
+    } catch (err) {}
+  }
+
+  function pintar(e) { pintarFila(e); pintarPestanas(); pintarPedidos(); pintarSituaciones(); pintarPortada(); pintarTitulo(); }
+  function pintarTodo() { E.forEach(pintarFila); pintarPestanas(); pintarPedidos(); pintarSituaciones(); pintarPortada(); pintarTitulo(); }
+
+  /* ── Los marcos de los chats ──────────────────────────────────────────────────────────────── */
+  function asegurarMarco(e) {
+    if (e.marco || e.disponible === false) return;
+    var f = document.createElement('iframe');
+    f.className = 'marco';
+    f.title = 'Chat con ' + e.ent.nombre;
+    f.setAttribute('allow', 'microphone; autoplay; fullscreen; picture-in-picture; encrypted-media');
+    f.setAttribute('aria-hidden', 'true');
+    f.setAttribute('inert', '');
+    f.tabIndex = -1;
+    f.src = 'charla.html?e=' + encodeURIComponent(e.ent.slug) + PROCEDENCIA;
+    $('marcos').appendChild(f);
+    e.marco = f;
+  }
+  function decir(e, m) {
+    if (!e.marco) return;
+    m.app = 'grupo';
+    // Antes de que el marco salude todavía no escucha. Lo que la persona pidió mandar se guarda;
+    // lo demás (dónde está parado, el teclado) se le cuenta cuando salude.
+    if (!e.conectado) { if (m.tipo === 'enviar' || m.tipo === 'arranque') e.cola.push(m); return; }
+    try { e.marco.contentWindow.postMessage(m, ORIGEN); } catch (err) {}
+  }
+  // Le cuenta a un marco si es el que se está viendo. Al que se ve se le da el foco sólo en
+  // pantalla ancha: en el teléfono eso abriría el teclado sin que nadie lo pida.
+  function situar(e, conFoco) {
+    if (!e.marco) return;
+    var si = vista === e.ent.slug;
+    e.marco.classList.toggle('activo', si);
+    if (si) { e.marco.removeAttribute('inert'); e.marco.removeAttribute('aria-hidden'); e.marco.tabIndex = 0; }
+    else { e.marco.setAttribute('inert', ''); e.marco.setAttribute('aria-hidden', 'true'); e.marco.tabIndex = -1; }
+    if (si && conFoco && !e.conectado) e.focoPendiente = true;
+    decir(e, { tipo: 'activar', activo: si, foco: si && !!conFoco && ANCHA.matches });
+    if (si) decir(e, { tipo: 'teclado', abierto: teclado });
+  }
+
+  window.addEventListener('message', function (ev) {
+    if (ev.origin !== ORIGEN) return;
+    var m = ev.data;
+    if (!m || m.app !== 'grupo' || typeof m.slug !== 'string') return;
+    var e = porSlug(m.slug);
+    if (!e || !e.marco || ev.source !== e.marco.contentWindow) return;
+
+    if (m.tipo === 'hola') {            // el marco (re)cargó y ya escucha: se le dice dónde está parado
+      // Recién publicada una versión puede cargar un marco nuevo dentro de la app vieja (o al revés).
+      // Si no hablan lo mismo, la app se recarga una vez para quedar pareja.
+      if (m.version !== C.VERSION && !sessionStorage.getItem('grupo2_recargada')) {
+        try { sessionStorage.setItem('grupo2_recargada', '1'); } catch (err) {}
+        location.reload();
+        return;
+      }
+      e.conectado = true;
+      var conFoco = e.focoPendiente;
+      e.focoPendiente = false;
+      situar(e, conFoco);
+      e.cola.splice(0).forEach(function (p) { decir(e, p); });
+    } else if (m.tipo === 'estado') {
+      e.estadoMarco = String(m.estado || '');
+      if (m.estado === 'no') { e.disponible = false; e.ultimo = null; e.deEllos = null; e.caso = ''; e.novedad = false; }
+      if (m.estado !== 'listo') e.asentado = false;
+      pintar(e);
+    } else if (m.tipo === 'mensajes') {
+      recibirMensajes(e, m);
+    } else if (m.tipo === 'sin-enviar') {
+      notar(porQueNoSeEnvio(e, m));
+    }
+  });
+
+  function rolDe(r) { return r === 'yo' ? 'yo' : r === 'equipo' ? 'equipo' : 'bot'; }
+  function recibirMensajes(e, m) {
+    var u = m.ultimo, d = m.deEllos;
+    e.ultimo = u && typeof u === 'object' ? { rol: rolDe(u.rol), texto: C.texto(String(u.texto || ''), 160), at: Date.parse(u.at) || 0 } : null;
+    e.deEllos = d && typeof d === 'object' ? { rol: rolDe(d.rol), at: Date.parse(d.at) || 0, huella: String(d.huella || '').slice(0, 16) } : null;
+    e.caso = C.texto(typeof m.caso === 'string' ? m.caso : '', 60);
+    e.asentado = !!m.asentado;
+    contarNovedad(e);
+    // Se avisa una vez por novedad, y recién cuando el marco terminó de cargar lo que había de antes.
+    if (e.novedad && e.asentado && !e.anunciada) { e.anunciada = true; anunciar(e); }
+    pintar(e);
+  }
+
+  /* ── ¿Hay algo nuevo? ─────────────────────────────────────────────────────────────────────────
+   *
+   * Se guarda, por entidad, la hora del último mensaje de ellos que la persona ya vio. Hay una
+   * trampa: el chat le pone a cada mensaje la hora del TELÉFONO cuando lo pinta en vivo, y la del
+   * SERVIDOR cuando lo vuelve a traer al recargar. Si el reloj del teléfono atrasa, el mismo
+   * mensaje «vuelve» con una hora posterior a la que se guardó y parecería nuevo. Por eso además
+   * de la hora se guarda una huella del mensaje (no su texto): si el último mensaje es el mismo que
+   * ya se vio y la diferencia es de pocos minutos, no es novedad.
+   */
+  function seEstaViendo(e) { return vista === e.ent.slug && document.visibilityState === 'visible'; }
+  function contarNovedad(e) {
+    var d = e.deEllos;
+    if (seEstaViendo(e)) {
+      var t = Math.max(e.visto.t, d ? d.at : 0, Date.now()), h = d ? d.huella : e.visto.h;
+      if (h !== e.visto.h || t - e.visto.t > 1000) {
+        e.visto = { t: t, h: h };
+        C.guardar('grupo2_visto_' + e.ent.slug, JSON.stringify(e.visto));
+      }
+    }
+    var mismo = d && d.huella === e.visto.h && d.at - e.visto.t < 5 * 60000;
+    e.novedad = !!d && d.at > e.visto.t && !mismo;
+    if (!e.novedad) e.anunciada = false;
+  }
+
+  // Al arrancar se abren de fondo los chats que ya tienen una conversación, de a uno, para poder
+  // mostrar el último mensaje y si hay algo nuevo. Los demás se abren recién cuando se los elige.
+  // Con el ahorro de datos del teléfono activado no se abre ninguno de fondo.
+  function precargar() {
+    if (!enLinea || (navigator.connection && navigator.connection.saveData)) return;
+    var faltan = E.filter(function (e) { return !e.marco && e.disponible !== false && C.hayConversacion(e.ent); });
+    (function siguiente() {
+      var e = faltan.shift();
+      if (!e) return;
+      asegurarMarco(e);
+      setTimeout(siguiente, 1200);
+    }());
+  }
+
+  /* ── Ir de una vista a otra ───────────────────────────────────────────────────────────────── */
+  function mostrar(v, conFoco) {
+    var e = v === 'inicio' ? null : porSlug(v);
+    if (!e || e.disponible === false) { v = 'inicio'; e = null; }
+    vista = v;
+    app.setAttribute('data-vista', v);
+    if (e) asegurarMarco(e);
+    E.forEach(function (x) { situar(x, conFoco); });
+    if (e) { contarNovedad(e); ocultarNovedad(e); }
+    E.forEach(pintarFila);
+    pintarPestanas();
+    pintarTitulo();
+  }
+  // Un toque de la persona. En el teléfono, entrar a un chat desde el inicio apila una entrada en el
+  // historial, así «atrás» vuelve al inicio; pasar de un chat a otro no apila nada.
+  function navegar(v) {
+    if (v === vista) return;
+    var apilado = !!(history.state && history.state.apilado);
+    if (v === 'inicio') {
+      if (apilado) { history.back(); return; }      // sigue en `popstate`
+      history.replaceState({ v: 'inicio' }, '', './');
+    } else if (vista === 'inicio' && !ANCHA.matches) {
+      history.pushState({ v: v, apilado: true }, '', '?e=' + v);
+    } else {
+      history.replaceState({ v: v, apilado: apilado }, '', '?e=' + v);
+    }
+    mostrar(v, true);
+  }
+  function vistaDeLaUrl() {
+    var e = C.entidad(new URLSearchParams(location.search).get('e'));
+    return e ? e.slug : 'inicio';
+  }
+  window.addEventListener('popstate', function () { mostrar(vistaDeLaUrl(), false); });
+
+  /* ── Mandar algo a un chat ────────────────────────────────────────────────────────────────── */
+  function haySalida() {
+    if (enLinea) return true;
+    notar('Sin conexión. Probá de nuevo cuando vuelva.');
+    return false;
+  }
+  // Lo que la persona escribió en el inicio, a quien ella elige. El texto queda en el campo: si no
+  // era para esa entidad, vuelve al inicio y se lo manda a otra sin escribirlo de nuevo.
+  function preguntar(e, texto) {
+    if (!haySalida()) return;
+    if (consulta.enviadaA.indexOf(e.ent.slug) < 0) consulta.enviadaA.push(e.ent.slug);
+    recordarConsulta();
+    navegar(e.ent.slug);
+    decir(e, { tipo: 'enviar', texto: texto });
+    pintarResultados();
+  }
+  // Una pregunta de ejemplo de la entidad (del buscador o de un tema).
+  function consultar(e, texto) {
+    if (!haySalida()) return;
+    limpiarConsulta();
+    navegar(e.ent.slug);
+    decir(e, { tipo: 'enviar', texto: texto });
+  }
+  // Un botón de arranque del chat de la entidad.
+  function arrancar(e, intencion) {
+    if (intencion.enlace) { window.open(intencion.enlace, '_blank', 'noopener,noreferrer'); return; }
+    if (!haySalida()) return;
+    limpiarConsulta();
+    navegar(e.ent.slug);
+    decir(e, { tipo: 'arranque', etiqueta: intencion.etiqueta, texto: intencion.texto });
+  }
+  function porQueNoSeEnvio(e, m) {
+    var quedo = m.escrito ? ' Tu consulta quedó escrita abajo: mandala cuando quieras.' : ' Tu consulta no se mandó.';
+    if (m.motivo === 'tramite') return 'Tenés un trámite sin terminar con ' + e.ent.nombre + '.' + quedo;
+    if (m.motivo === 'pregunta') return e.ent.nombre + ' te hizo una pregunta y espera tu respuesta.' + quedo;
+    if (m.motivo === 'borrador') return 'Ya tenías algo escrito en este chat y no lo pisamos. Tu consulta no se mandó.';
+    return 'No pudimos mandar tu consulta.' + (m.escrito ? ' Quedó escrita abajo: tocá enviar.' : ' Probá de nuevo.');
+  }
+
+  /* ── El campo de consulta ─────────────────────────────────────────────────────────────────────
+   *
+   * Busca entre lo que cada entidad ya ofrece: los botones de arranque de su chat y las preguntas
+   * de ejemplo de su página. No interpreta ni decide: muestra coincidencias, dice de quién es cada
+   * una, y la persona elige. Si nada coincide, ella elige igual a quién mandarle lo que escribió.
+   */
+  var VACIAS = ' que como para por con sin una uno unos unas los las del mis tus sus hay soy estoy esta este esto eso esa tengo tiene quiero quisiera necesito puedo puede hacer hago saber donde cuando cuanto cual porque pero muy mas les nos hola buenas buen dia tardes noches gracias favor consulta consultar sobre algo alguien ';
+  function palabrasDe(q) {
+    return C.norm(q).split(/[^a-z0-9]+/).filter(function (p) { return p.length >= 3 && VACIAS.indexOf(' ' + p + ' ') < 0; })
+      .map(function (p) { return p.length > 4 && p.charAt(p.length - 1) === 's' ? p.slice(0, -1) : p; });   // «medicamentos» encuentra «medicamento»
+  }
+  function recordarConsulta() { try { sessionStorage.setItem('grupo2_consulta', JSON.stringify(consulta)); } catch (err) {} }
+
+  function buscar(q) {
+    var palabras = palabrasDe(q), hallados = [], cercanas = {};
+    if (!palabras.length) return { temas: [], cercanas: cercanas };
+    var minimo = Math.ceil(palabras.length / 2);
+    function aciertos(donde) { return palabras.filter(function (p) { return donde.indexOf(p) >= 0; }).length; }
+    E.forEach(function (e) {
+      if (e.disponible === false) return;
+      var vistos = {};
+      ((e.cfg && e.cfg.intenciones) || []).forEach(function (i) {
+        var n = aciertos(C.norm(i.etiqueta + ' ' + i.texto));
+        vistos[C.norm(i.texto)] = true;
+        if (n >= minimo) hallados.push({ e: e, i: i, n: n + 0.5 });      // a igual coincidencia, primero los botones del chat
+      });
+      (e.ent.consultas || []).forEach(function (c) {
+        if (vistos[C.norm(c.texto)]) return;                            // ya está como botón del chat
+        var n = aciertos(C.norm(c.texto + ' ' + c.tema));
+        if (n >= minimo) hallados.push({ e: e, c: c, n: n });
+      });
+      if (aciertos(C.norm(e.ent.nombre + ' ' + e.ent.que + ' ' + e.ent.temas))) cercanas[e.ent.slug] = true;
+    });
+    hallados.sort(function (a, b) { return b.n - a.n; });
+    hallados = hallados.slice(0, 8);
+    hallados.forEach(function (h) { cercanas[h.e.ent.slug] = true; });
+    return { temas: hallados, cercanas: cercanas };
+  }
+
+  function filaPregunta(titulo, e, detalle, alTocar) {
+    var li = el('li'), b = el('button', 'fila fila-pregunta');
+    b.type = 'button';
+    var txt = el('span', 'fila-texto');
+    txt.appendChild(el('span', 'fila-nombre', titulo));
+    txt.appendChild(deQuien(e, detalle));
+    b.appendChild(txt); b.appendChild(flecha());
+    b.addEventListener('click', alTocar);
+    li.appendChild(b);
+    return li;
+  }
+
+  function pintarResultados() {
+    var q = consulta.texto.trim(), sit = consulta.situacion, hay = !!q || !!sit;
+    app.classList.toggle('buscando', hay);
+    $('resultados').hidden = !hay;
+    $('portada').hidden = hay;
+    $('consulta-borrar').hidden = !hay;
+    if (!hay) return;
+
+    var ulT = $('res-temas-lista');
+    ulT.textContent = '';
+    if (sit) {                 // un tema del inicio: todas sus preguntas, de las entidades disponibles
+      var nombreSit = '';
+      (G.situaciones || []).forEach(function (s) { if (s.id === sit) nombreSit = s.nombre; });
+      $('res-temas-rotulo').textContent = nombreSit;
+      E.forEach(function (e) {
+        if (e.disponible === false) return;
+        (e.ent.consultas || []).forEach(function (c) {
+          if (c.sit === sit) ulT.appendChild(filaPregunta(c.texto, e, c.tema, function () { consultar(e, c.texto); }));
+        });
+      });
+      $('res-temas').hidden = !ulT.children.length;
+      $('res-enviar').hidden = true;
+      $('res-corta').hidden = true;
+      return;
+    }
+
+    var r = buscar(q);
+    $('res-temas-rotulo').textContent = 'Temas';
+    r.temas.forEach(function (t) {
+      if (t.i) ulT.appendChild(filaPregunta(t.i.etiqueta, t.e, t.e.ent.que, function () { arrancar(t.e, t.i); }));
+      else ulT.appendChild(filaPregunta(t.c.texto, t.e, t.c.tema, function () { consultar(t.e, t.c.texto); }));
+    });
+    $('res-temas').hidden = !r.temas.length;
+
+    // A quién mandarle lo escrito. Primero las entidades que tienen que ver con lo escrito.
+    var puede = q.length >= 3;
+    var ulE = $('res-enviar-lista');
+    ulE.textContent = '';
+    var orden = E.filter(function (e) { return e.disponible !== false; }).sort(function (a, b) {
+      return (r.cercanas[b.ent.slug] ? 1 : 0) - (r.cercanas[a.ent.slug] ? 1 : 0);
+    });
+    orden.forEach(function (e) {
+      var ya = consulta.enviadaA.indexOf(e.ent.slug) >= 0;
+      var li = el('li'), b = el('button', 'fila');
+      b.type = 'button';
+      b.setAttribute('aria-label', (ya ? 'Ver la conversación con ' : 'Mandarle tu consulta a ') + e.ent.nombre + ', ' + e.ent.que.toLowerCase());
+      var txt = el('span', 'fila-texto'), nombre = el('span', 'fila-nombre');
+      nombre.appendChild(el('span', null, e.ent.nombre));
+      nombre.appendChild(el('span', 'fila-que', e.ent.que));
+      txt.appendChild(nombre);
+      txt.appendChild(el('span', 'fila-previa', ya ? 'Ya se la mandaste. Tocá para ver la respuesta.'
+        : (e.cfg && e.cfg.bot ? 'Responde ' + e.cfg.bot + ', asistente virtual' : e.ent.temas)));
+      var meta = el('span', 'fila-meta');
+      if (ya) meta.appendChild(el('span', 'enviada', 'Enviada')); else meta.appendChild(flecha(AVION));
+      b.appendChild(avatar(e)); b.appendChild(txt); b.appendChild(meta);
+      b.addEventListener('click', function () { if (ya) navegar(e.ent.slug); else preguntar(e, q); });
+      li.appendChild(b); ulE.appendChild(li);
+    });
+    $('res-enviar').hidden = !puede || !orden.length;
+    $('res-enviar-rotulo').textContent = consulta.enviadaA.length ? '¿Era para otro? Mandásela también a' : 'Mandarle tu consulta a';
+    $('res-corta').hidden = puede || r.temas.length > 0;
+  }
+
+  function limpiarConsulta() {
+    consulta = { texto: '', enviadaA: [], situacion: '' };
+    $('consulta-campo').value = '';
+    recordarConsulta();
+    pintarResultados();
+  }
+  function abrirSituacion(id) {
+    consulta = { texto: '', enviadaA: [], situacion: id };
+    $('consulta-campo').value = '';
+    recordarConsulta();
+    pintarResultados();
+    $('inicio').scrollTop = 0;
+    $('consulta-borrar').focus();     // el lector de pantalla queda al lado de la lista, con la forma de volver
+  }
+
+  function prepararConsulta() {
+    var campo = $('consulta-campo');
+    try {
+      var g = JSON.parse(sessionStorage.getItem('grupo2_consulta') || 'null');
+      if (g && typeof g.texto === 'string') {
+        consulta = {
+          texto: g.texto.slice(0, 500),
+          enviadaA: Array.isArray(g.enviadaA) ? g.enviadaA.filter(porSlug) : [],
+          situacion: (G.situaciones || []).some(function (s) { return s.id === g.situacion; }) ? g.situacion : ''
+        };
+        campo.value = consulta.texto;
+      }
+    } catch (err) {}
+    campo.addEventListener('input', function () {
+      // Texto nuevo: nadie lo recibió todavía, y deja de mirarse un tema.
+      if (campo.value !== consulta.texto || consulta.situacion) consulta = { texto: campo.value, enviadaA: [], situacion: '' };
+      recordarConsulta();
+      pintarResultados();
+    });
+    // «Buscar» en el teclado del teléfono: lo baja, para que se vea a quién mandarle la consulta.
+    $('consulta').addEventListener('submit', function (ev) { ev.preventDefault(); campo.blur(); });
+    $('consulta-borrar').addEventListener('click', function () { limpiarConsulta(); if (ANCHA.matches) campo.focus(); });
+    pintarResultados();
+  }
+
+  /* ── Avisos que aparecen arriba un momento ────────────────────────────────────────────────── */
+  var relojNovedad = 0, relojNota = 0;
+  // «Te contestaron» en una conversación que no se está mirando. Se toca para ir.
+  function anunciar(e) {
+    if (seEstaViendo(e)) return;
+    var quien = (e.deEllos && e.deEllos.rol === 'equipo' ? 'Una persona de ' + e.ent.nombre : e.ent.nombre) + ' te contestó';
+    $('anuncio').textContent = quien;                 // para el lector de pantalla
+    var b = $('novedad');
+    b.textContent = '';
+    b.appendChild(avatar(e, 'chico'));
+    b.appendChild(el('span', null, quien));
+    b.setAttribute('data-slug', e.ent.slug);
+    $('nota-app').hidden = true;
+    b.hidden = false;
+    clearTimeout(relojNovedad);
+    relojNovedad = setTimeout(function () { b.hidden = true; }, 7000);
+  }
+  function ocultarNovedad(e) {
+    var b = $('novedad');
+    if (b.getAttribute('data-slug') === e.ent.slug) { b.hidden = true; clearTimeout(relojNovedad); }
+  }
+  $('novedad').addEventListener('click', function () {
+    var e = porSlug($('novedad').getAttribute('data-slug'));
+    if (e) navegar(e.ent.slug);
+  });
+  // Una nota de la app (no se pudo mandar, sin conexión…). Se va sola o al tocarla.
+  function notar(texto) {
+    var n = $('nota-app');
+    n.textContent = texto;
+    $('novedad').hidden = true;
+    n.hidden = false;
+    clearTimeout(relojNota);
+    relojNota = setTimeout(function () { n.hidden = true; }, 9000);
+  }
+  $('nota-app').addEventListener('click', function () { $('nota-app').hidden = true; });
+
+  /* ── El teclado del teléfono ──────────────────────────────────────────────────────────────────
+   *
+   * Al abrirse, el navegador no achica la página: dibuja el teclado encima, y lo de abajo (el campo
+   * de escribir) queda tapado. `visualViewport` dice cuánta pantalla queda de verdad a la vista; con
+   * eso la app se achica a ese alto y el chat sube con el teclado. Es la misma cuenta que hace el
+   * chat de la plataforma cuando está suelto en una página (acá, adentro de un marco, el chat no
+   * puede hacerla: ve el alto del marco, no el de la pantalla).
+   *
+   * Esto no se puede probar en una computadora: hace falta un teléfono. `?depurar=1` dibuja los
+   * números arriba para poder mandar una captura.
+   */
+  var vv = window.visualViewport, depurador = null;
+  if (/[?&]depurar=1/.test(location.search)) {
+    depurador = el('div');
+    depurador.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:99;padding:2px 6px;background:#000;color:#0f0;font:11px monospace;pointer-events:none';
+    app.appendChild(depurador);
+  }
+  function ajustarAlto() {
+    // Con zoom de pellizco lo visible también se achica, y no es el teclado: no se toca nada.
+    var conZoom = Math.abs((vv.scale || 1) - 1) > 0.01;
+    var abierto = !conZoom && vv.height < window.innerHeight * 0.78;
+    if (conZoom) { app.style.removeProperty('--alto'); app.style.transform = ''; }
+    else {
+      app.style.setProperty('--alto', Math.round(vv.height) + 'px');
+      app.style.transform = vv.offsetTop ? 'translateY(' + Math.round(vv.offsetTop) + 'px)' : '';
+    }
+    if (abierto !== teclado) {
+      teclado = abierto;
+      app.classList.toggle('teclado', teclado);
+      E.forEach(function (e) { decir(e, { tipo: 'teclado', abierto: teclado }); });
+    }
+    if (depurador) depurador.textContent = 'visible ' + Math.round(vv.height) + ' · ventana ' + window.innerHeight + ' · corrida ' + Math.round(vv.offsetTop) + ' · zoom ' + (vv.scale || 1).toFixed(2) + ' · teclado ' + (teclado ? 'sí' : 'no');
+  }
+  if (vv) {
+    var pendiente = false;
+    var diferir = function () { if (pendiente) return; pendiente = true; requestAnimationFrame(function () { pendiente = false; ajustarAlto(); }); };
+    vv.addEventListener('resize', diferir);
+    vv.addEventListener('scroll', diferir);
+    ajustarAlto();
+  }
+
+  /* ── Conexión y volver a la app ───────────────────────────────────────────────────────────── */
+  function vigilarConexion() {
+    function alCambiar() {
+      enLinea = navigator.onLine !== false;
+      $('sin-red').hidden = enLinea;
+      pintarTodo();
+      if (enLinea) E.forEach(cargarConfig);
+    }
+    window.addEventListener('online', alCambiar);
+    window.addEventListener('offline', alCambiar);
+    $('sin-red').hidden = enLinea;
+  }
+  // Al volver a la app: lo que está en pantalla pasa a estar visto y, si estuvo un rato fuera de la
+  // vista, cada chat se pone al día (el chat no vuelve a pedir lo que llegó mientras estaba
+  // desconectado; el marco se recarga solo si la persona no tenía nada a medio escribir).
+  var ocultaDesde = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') { ocultaDesde = Date.now(); return; }
+    var unRato = ocultaDesde && Date.now() - ocultaDesde > 60000;
+    ocultaDesde = 0;
+    if (unRato && enLinea) E.forEach(function (e) { decir(e, { tipo: 'refrescar' }); });
+    var e = vista === 'inicio' ? null : porSlug(vista);
+    if (e) { contarNovedad(e); pintar(e); }
+  });
+
+  /* ── Instalar ─────────────────────────────────────────────────────────────────────────────────
+   * Se ofrece una sola vez y recién cuando la persona ya usó la app (tiene una conversación): antes
+   * no sabe para qué la querría. En Android el navegador da un botón; en iPhone hay que explicar el
+   * camino, porque Safari no avisa ni deja instalar con un toque.
+   */
+  var pedidoInstalar = null, instalable = false;
+  function ofrecerInstalar() {
+    var caja = $('instalar');
+    if (!instalable || C.leer('grupo2_instalar') === 'no' || !algunaConversacion()) { caja.hidden = true; return; }
+    caja.hidden = false;
+  }
+  function prepararInstalacion() {
+    var instalada = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if (instalada) return;
+    var texto = $('instalar-texto'), ok = $('instalar-ok');
+    $('instalar-no').addEventListener('click', function () { C.guardar('grupo2_instalar', 'no'); ofrecerInstalar(); });
+    window.addEventListener('beforeinstallprompt', function (ev) {
+      ev.preventDefault();
+      pedidoInstalar = ev;
+      instalable = true;
+      texto.textContent = '¿La querés tener como app? Queda en la pantalla del teléfono, como cualquier otra.';
+      ok.hidden = false;
+      ofrecerInstalar();
+    });
+    ok.addEventListener('click', function () {
+      if (!pedidoInstalar) return;
+      pedidoInstalar.prompt();
+      pedidoInstalar.userChoice.then(function () { pedidoInstalar = null; instalable = false; ofrecerInstalar(); });
+    });
+    window.addEventListener('appinstalled', function () { instalable = false; ofrecerInstalar(); });
+    var ua = navigator.userAgent || '';
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) {
+      instalable = true;
+      texto.textContent = '¿La querés tener como app en el iPhone? Tocá Compartir y elegí «Agregar a inicio».';
+    }
+  }
+
+  /* ── Borrar las conversaciones de este teléfono ───────────────────────────────────────────────
+   * Para el teléfono compartido (con la familia, en el puesto). Se olvida la credencial de cada
+   * chat, que es lo que permite volver a ver la conversación desde acá. No borra nada en la
+   * entidad, y por eso se dice con todas las letras antes de hacerlo.
+   */
+  function prepararOlvido() {
+    var caja = $('olvidar-caja');
+    $('olvidar-abrir').addEventListener('click', function () { caja.hidden = !caja.hidden; if (!caja.hidden) $('olvidar-no').focus(); });
+    $('olvidar-no').addEventListener('click', function () { caja.hidden = true; $('olvidar-abrir').focus(); });
+    $('olvidar-ok').addEventListener('click', function () {
+      E.forEach(function (e) {
+        C.borrar('webchat_token_' + e.ent.clave);
+        C.borrar('grupo2_visto_' + e.ent.slug);
+        if (e.marco) e.marco.remove();
+        e.marco = null; e.conectado = false; e.cola = []; e.focoPendiente = false; e.estadoMarco = '';
+        e.ultimo = null; e.deEllos = null; e.caso = ''; e.asentado = false; e.novedad = false; e.anunciada = false;
+        e.visto = { t: 0, h: '' };
+      });
+      caja.hidden = true;
+      consulta = { texto: '', enviadaA: [], situacion: '' };
+      $('consulta-campo').value = '';
+      recordarConsulta();
+      pintarResultados();
+      history.replaceState({ v: 'inicio' }, '', './');
+      mostrar('inicio', false);
+      pintarTodo();
+      notar('Listo. En este teléfono ya no queda ninguna conversación.');
+    });
+  }
+
+  /* ── Arranque ─────────────────────────────────────────────────────────────────────────────── */
+  function cargarConfig(e) {
+    return C.pedirConfig(e.ent).then(function (r) {
+      if (r.estado === 'ok') { e.cfg = r.cfg; e.disponible = true; }
+      else if (r.estado === 'no') { e.cfg = null; e.disponible = false; if (vista === e.ent.slug) mostrar('inicio', false); }
+      else if (r.cfg) e.cfg = r.cfg;
+      pintar(e);
+      if (consulta.texto || consulta.situacion) pintarResultados();   // cambió qué temas hay o quién está disponible
+    });
+  }
+
+  document.querySelectorAll('[data-app-nombre]').forEach(function (n) { n.textContent = G.nombre; });
+  armarConversaciones();
+  armarPestanas();
+  pintarPedidos();
+  pintarSituaciones();
+  prepararConsulta();
+  vigilarConexion();
+  prepararInstalacion();
+  prepararOlvido();
+  pintarPortada();
+
+  history.replaceState({ v: vistaDeLaUrl(), apilado: false }, '', location.href);
+  mostrar(vistaDeLaUrl(), false);
+
+  Promise.all(E.map(cargarConfig)).then(function () { setTimeout(precargar, 600); });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+}());

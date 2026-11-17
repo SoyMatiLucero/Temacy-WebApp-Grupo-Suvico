@@ -1,0 +1,370 @@
+/*
+ * Web app del grupo, versión 2. Teléfono primero.
+ *
+ * Sin tipografías ni recursos de afuera: tiene que abrir sin red y en teléfonos modestos.
+ * El color es sobrio a propósito: neutros apenas teñidos y, como único color fuerte, el de cada
+ * entidad, que sólo se usa para identificarla (su logo, su pestaña). La marca del grupo todavía
+ * no está definida; cuando exista, entra por estas variables.
+ *
+ * Los colores están pensados en OKLCH. Van primero en hexadecimal (los teléfonos viejos no
+ * entienden OKLCH) y después, donde se puede, en OKLCH. Contrastes medidos: tinta sobre fondo 15,8;
+ * texto secundario sobre fondo 6,7 (claro) y 8,3 (oscuro); bordes de controles 3,3.
+ */
+:root {
+  color-scheme: light dark;
+  --fondo: #f6f3ee;         /* el papel de la app */
+  --superficie: #fefcf9;    /* lo que se apoya encima: el campo, las pestañas */
+  --hundido: #eeebe5;       /* fila elegida, fila bajo el dedo, cajas de aviso */
+  --linea: #dcd9d3;
+  --linea-fuerte: #89867e;  /* bordes de controles: 3:1 contra el fondo */
+  --suave: #59554d;         /* texto secundario */
+  --tinta: #1c1913;
+  --novedad: #1f8a4c;       /* el punto de «hay algo nuevo» */
+  --aviso-fondo: #fbe6af;
+  --aviso-tinta: #4a2f00;
+  --sombra: 0 6px 24px rgba(28, 25, 19, .18);
+
+  /* el color de una entidad: lo pone app.js en cada pieza que la representa */
+  --marca: var(--tinta);
+  --marca-tinta: var(--superficie);
+
+  --e1: 4px; --e2: 8px; --e3: 12px; --e4: 16px; --e5: 24px; --e6: 32px; --e7: 48px;
+  --t-meta: .8125rem;   /* 13 */
+  --t-menor: .9375rem;  /* 15 */
+  --t-base: 1rem;       /* 16 */
+  --t-fila: 1.0625rem;  /* 17 */
+  --t-titulo: 1.75rem;  /* 28 */
+  --barra: 60px;        /* alto de las pestañas */
+  --z-pestanas: 10;
+  --z-globo: 20;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #100e0a;
+    --superficie: #191713;
+    --hundido: #23201b;
+    --linea: #33302a;
+    --linea-fuerte: #78746d;
+    --suave: #aeaaa3;
+    --tinta: #efece8;
+    --novedad: #5fd08c;
+    --aviso-fondo: #43330a;
+    --aviso-tinta: #f9e7b3;
+    --sombra: 0 6px 24px rgba(0, 0, 0, .5);
+  }
+}
+@supports (color: oklch(0% 0 0)) {
+  :root {
+    --fondo: oklch(96.5% .007 85);
+    --superficie: oklch(99.2% .004 85);
+    --hundido: oklch(94% .008 85);
+    --linea: oklch(88.5% .009 85);
+    --linea-fuerte: oklch(62% .012 85);
+    --suave: oklch(45% .013 85);
+    --tinta: oklch(21.5% .012 85);
+    --aviso-fondo: oklch(93% .075 90);
+    --aviso-tinta: oklch(33% .07 75);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fondo: oklch(16.5% .008 85);
+      --superficie: oklch(20.5% .009 85);
+      --hundido: oklch(24.5% .01 85);
+      --linea: oklch(31% .011 85);
+      --linea-fuerte: oklch(56% .012 85);
+      --suave: oklch(74% .011 85);
+      --tinta: oklch(94.5% .006 85);
+      --aviso-fondo: oklch(33% .06 85);
+      --aviso-tinta: oklch(93% .07 92);
+    }
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--fondo); }
+body {
+  color: var(--tinta);
+  font: var(--t-base)/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; }
+h1, h2, p, ul { margin: 0; }
+ul { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid var(--tinta); outline-offset: 2px; border-radius: 10px; }
+.solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sin-js { padding: var(--e5); color: var(--suave); }
+
+/* ── El armazón ────────────────────────────────────────────────────────────────────────────────
+   Ocupa exactamente lo que se ve. `--alto` lo escribe app.js cuando se abre el teclado del
+   teléfono (el navegador no achica la página: dibuja el teclado encima), así el chat sube con el
+   teclado en vez de quedar tapado. */
+.app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: var(--alto, 100dvh);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.aviso-red {
+  grid-row: 1;
+  padding: calc(var(--e2) + env(safe-area-inset-top)) var(--e4) var(--e2);
+  background: var(--aviso-fondo);
+  color: var(--aviso-tinta);
+  font-size: var(--t-menor);
+  font-weight: 600;
+  text-align: center;
+}
+.inicio, .charlas { grid-row: 2; grid-column: 1; min-height: 0; }
+
+/* ── Inicio ───────────────────────────────────────────────────────────────────────────────── */
+.inicio {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--fondo);
+  padding:
+    calc(var(--e5) + env(safe-area-inset-top)) calc(var(--e4) + env(safe-area-inset-right))
+    var(--e6) calc(var(--e4) + env(safe-area-inset-left));
+}
+.inicio > * { max-width: 560px; margin-inline: auto; }
+.aviso-red:not([hidden]) ~ .inicio { padding-top: var(--e5); }
+.app:not([data-vista="inicio"]) .inicio { display: none; }
+
+.cabecera { margin-bottom: var(--e4); }
+.app-nombre { color: var(--suave); font-size: var(--t-menor); font-weight: 600; }
+h1 { margin-top: var(--e1); font-size: var(--t-titulo); line-height: 1.15; letter-spacing: -.02em; font-weight: 800; }
+/* Escribiendo, lo que importa es lo que aparece debajo del campo: el título se corre para darle lugar. */
+.app.teclado .cabecera, .app.buscando .cabecera { display: none; }
+
+.consulta { position: relative; }
+.consulta input {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 52px 0 46px;
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 16px;
+  background: var(--superficie);
+  color: var(--tinta);
+  font: inherit;
+  font-size: var(--t-fila);
+}
+.consulta input::placeholder { color: var(--suave); opacity: 1; }
+.consulta input:focus-visible { outline-offset: 0; border-color: var(--tinta); border-radius: 16px; }
+.consulta-lupa { position: absolute; left: 16px; top: 18px; color: var(--suave); pointer-events: none; }
+.consulta-borrar {
+  position: absolute; right: 6px; top: 6px;
+  display: grid; place-items: center;
+  width: 44px; height: 44px;
+  border: 0; border-radius: 12px; background: transparent; color: var(--suave); cursor: pointer;
+}
+
+.rotulo {
+  margin: var(--e5) 0 var(--e1);
+  color: var(--suave);
+  font-size: var(--t-meta);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.nota { margin-top: var(--e5); color: var(--suave); font-size: var(--t-menor); text-wrap: pretty; }
+.nota.chica { margin-top: var(--e2); font-size: var(--t-meta); }
+
+/* Las filas: una lista con renglones finos, como la de cualquier app de mensajes. Sin tarjetas. */
+.filas > li + li { border-top: 1px solid var(--linea); }
+.fila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--e3);
+  width: calc(100% + var(--e2) * 2);
+  min-height: 72px;
+  margin-inline: calc(var(--e2) * -1);
+  padding: var(--e3) var(--e2);
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.fila:active, .fila[aria-current="true"] { background: var(--hundido); }
+@media (hover: hover) { .fila:hover { background: var(--hundido); } }
+.fila[aria-disabled="true"] { cursor: default; background: transparent; }
+.fila[aria-disabled="true"] > * { opacity: .55; }
+.fila-texto { min-width: 0; }
+.fila-nombre { display: flex; align-items: baseline; gap: var(--e2); font-size: var(--t-fila); font-weight: 700; line-height: 1.3; }
+.fila-que { min-width: 0; overflow: hidden; color: var(--suave); font-size: var(--t-meta); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.fila-previa {
+  margin-top: 2px;
+  color: var(--suave);
+  font-size: var(--t-menor);
+  line-height: 1.4;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.fila.con-novedad .fila-previa { color: var(--tinta); font-weight: 600; }
+.fila-meta { display: grid; justify-items: end; gap: var(--e1); color: var(--suave); font-size: var(--t-meta); white-space: nowrap; }
+.fila-flecha { display: grid; color: var(--linea-fuerte); }
+
+/* Una pregunta (del buscador o de un tema) y un tema del inicio: sin logo grande, el texto manda. */
+.fila-pregunta, .fila-situacion { grid-template-columns: minmax(0, 1fr) auto; min-height: 60px; }
+.fila-pregunta .fila-nombre, .fila-situacion .fila-nombre { display: block; font-weight: 600; }
+.fila-pregunta .fila-previa, .fila-situacion .fila-previa { display: flex; align-items: center; gap: 6px; }
+
+.avatar {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; flex: none;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--marca);
+  color: var(--marca-tinta);
+  font-size: 1.25rem; font-weight: 800;
+}
+/* Con logo el fondo es claro (los logos vienen pensados para eso) y lleva un borde fino. */
+.avatar img { width: 100%; height: 100%; object-fit: contain; padding: 4px; background: #fefcf9; }
+.avatar.con-logo { background: #fefcf9; border: 1px solid var(--linea); }
+.avatar.chico { width: 28px; height: 28px; border-radius: 9px; font-size: .875rem; }
+.avatar.chico img { padding: 2px; }
+.avatar.minimo { width: 20px; height: 20px; border-radius: 6px; font-size: .6875rem; }
+.avatar.minimo img { padding: 1px; }
+
+/* «Hay algo nuevo»: un punto. No lleva número a propósito: el chat parte una respuesta larga en
+   varias burbujas, y contar burbujas diría «3» por una sola respuesta. */
+.punto { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--novedad); }
+
+/* Lo más pedido: los botones de arranque que cada entidad ya tiene en su chat. */
+.temas-lista { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.tema {
+  display: inline-flex; align-items: center; gap: var(--e2);
+  min-height: 44px; padding: var(--e2) var(--e4) var(--e2) var(--e3);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 22px;
+  background: var(--superficie);
+  font-size: var(--t-menor); font-weight: 600; line-height: 1.25; text-align: left;
+  cursor: pointer;
+  transition: background-color .15s ease-out;
+}
+.tema:active { background: var(--hundido); }
+@media (hover: hover) { .tema:hover { background: var(--hundido); } }
+
+.enviada { color: var(--suave); font-size: var(--t-meta); font-weight: 700; }
+
+/* Cajas de aviso del inicio: instalar, confirmar el borrado */
+.caja { margin-top: var(--e5); padding: var(--e4); border-radius: 16px; background: var(--hundido); }
+.caja p { font-size: var(--t-menor); text-wrap: pretty; }
+.caja-acciones { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e3); }
+.olvidar { margin-top: var(--e4); }
+.olvidar > .boton-llano { padding-inline: 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.olvidar .caja { margin-top: var(--e2); }
+.boton, .boton-llano {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 var(--e4);
+  border: 0; border-radius: 12px;
+  font-size: var(--t-menor); font-weight: 700; cursor: pointer;
+}
+.boton { background: var(--tinta); color: var(--superficie); }
+.boton-llano { background: transparent; color: var(--suave); }
+
+/* ── Los chats ────────────────────────────────────────────────────────────────────────────── */
+.charlas { position: relative; background: var(--fondo); }
+.app[data-vista="inicio"] .charlas { visibility: hidden; }
+.marcos { position: absolute; inset: 0; }
+/* Todos los marcos tienen siempre el tamaño completo aunque no se vean: así el chat de adentro
+   sigue funcionando (recibe mensajes, mantiene dónde iba la lectura). Se ve uno solo. */
+.marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; background: var(--fondo); }
+.marco.activo { visibility: visible; }
+.vacio { display: none; }
+
+/* ── Pestañas (teléfono) ──────────────────────────────────────────────────────────────────── */
+.pestanas {
+  grid-row: 3;
+  position: relative;
+  z-index: var(--z-pestanas);
+  display: flex;
+  padding: 0 calc(var(--e1) + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(var(--e1) + env(safe-area-inset-left));
+  border-top: 1px solid var(--linea);
+  background: var(--superficie);
+}
+/* Con el teclado abierto las pestañas se van: ese lugar es de la conversación. */
+.app.teclado .pestanas { display: none; }
+.pestana {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: var(--barra);
+  padding: 6px 2px 5px;
+  color: var(--suave);
+  font-size: var(--t-meta);
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+}
+.pestana .nombre { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pestana[aria-current="page"] { color: var(--tinta); font-weight: 800; }
+.pestana[aria-disabled="true"] { opacity: .5; cursor: default; }
+/* La marca de «estás acá»: una raya corta arriba, del color de la entidad. */
+.pestana[aria-current="page"]::before {
+  content: ""; position: absolute; top: 0; left: 50%;
+  width: 28px; height: 3px; margin-left: -14px;
+  border-radius: 0 0 3px 3px;
+  background: var(--marca);
+}
+.pestana .icono { display: grid; place-items: center; width: 28px; height: 28px; }
+.pestana .punto { position: absolute; top: 5px; left: 50%; margin-left: 8px; box-sizing: content-box; border: 2px solid var(--superficie); }
+.pestana:focus-visible { outline-offset: -3px; }
+
+/* ── Avisos que aparecen arriba un momento ────────────────────────────────────────────────── */
+.globo {
+  position: absolute;
+  z-index: var(--z-globo);
+  top: calc(var(--e3) + env(safe-area-inset-top));
+  left: 50%;
+  width: max-content;
+  max-width: min(92%, 440px);
+  display: flex; align-items: center; gap: var(--e2);
+  min-height: 48px; margin: 0; padding: var(--e2) var(--e4) var(--e2) var(--e2);
+  border: 0; border-radius: 24px;
+  background: var(--tinta); color: var(--superficie);
+  box-shadow: var(--sombra);
+  font-size: var(--t-menor); font-weight: 600; line-height: 1.35; text-align: left;
+  cursor: pointer;
+  transform: translate(-50%, 0);
+  animation: globo-entra .22s cubic-bezier(.22, 1, .36, 1);
+}
+.globo .avatar { border: 0; }
+.globo.nota-app { padding-left: var(--e4); border-radius: 16px; cursor: default; }
+@keyframes globo-entra { from { opacity: 0; transform: translate(-50%, -12px); } }
+
+/* ── Pantalla ancha: el inicio como columna, el chat al lado ──────────────────────────────── */
+@media (min-width: 860px) {
+  .app { grid-template-columns: minmax(320px, 392px) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .aviso-red { grid-column: 1 / -1; }
+  .inicio { grid-column: 1; border-right: 1px solid var(--linea); padding-top: var(--e6); }
+  .app:not([data-vista="inicio"]) .inicio { display: block; }
+  .app.teclado .cabecera, .app.buscando .cabecera { display: block; }
+  .charlas { grid-column: 2; }
+  .app[data-vista="inicio"] .charlas { visibility: visible; }
+  .app[data-vista="inicio"] .vacio {
+    position: absolute; inset: 0;
+    display: grid; place-content: center; justify-items: center; gap: var(--e4);
+    padding: var(--e6);
+    color: var(--suave); text-align: center;
+  }
+  .vacio p { max-width: 28ch; font-size: var(--t-fila); text-wrap: balance; }
+  .pestanas { display: none; }
+  .globo { left: calc(50% + 196px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globo { animation: none; }
+  .tema { transition: none; }
+}
