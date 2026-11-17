@@ -58,7 +58,7 @@ function plataforma(req) {
 // Sólo se sirven archivos de estos tipos: lo demás (los .md, este mismo archivo si estuviera) da 404.
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2',
 };
 
 const rutaDe = (url) => { try { return decodeURIComponent(new URL(url, 'http://x').pathname); } catch (e) { return null; } };

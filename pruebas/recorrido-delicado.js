@@ -112,7 +112,12 @@ const movil = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isM
   });
   p = await c.newPage();
   await p.goto(URL0); await p.waitForSelector('#conversaciones .fila'); await p.waitForLoadState('networkidle');
+  // Desde la v3 se ve una cosa por vez también en pantalla grande: para escribir otra consulta hay
+  // que volver al inicio, y de un chat a otro se pasa por las pestañas (en la v2, por la columna).
+  const V = await p.evaluate(() => (window.Comun && window.Comun.VERSION) || 2);
+  const irA = (nombre) => (V >= 3 ? p.locator('.pestana', { hasText: nombre }) : p.locator('#conversaciones .fila', { hasText: nombre })).click();
   for (const [slug, nombre, texto] of [['ospevic', 'OSPEVIC', '¿Dónde está mi credencial?'], ['suvico', 'SUVICO', '¿Cómo me afilio a SUVICO?']]) {
+    if (V >= 3 && await p.locator('#inicio').isHidden()) await p.locator('.pestana', { hasText: 'Inicio' }).click();
     await p.locator('#consulta-campo').fill(texto);
     await p.locator('#res-temas-lista .fila').first().click();
     await p.waitForURL(new RegExp('e=' + slug));
@@ -128,8 +133,8 @@ const movil = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isM
   // Se miran las dos conversaciones: lo que haya llegado mientras no se veían pasa a estar visto.
   // (Una respuesta larga llega en varias burbujas; las últimas pueden caer cuando ya se cambió de chat,
   // y ese aviso es legítimo. Lo que se prueba después es que RECARGAR no invente avisos.)
-  await p.locator('#conversaciones .fila', { hasText: 'OSPEVIC' }).click(); await p.waitForTimeout(900);
-  await p.locator('#conversaciones .fila', { hasText: 'SUVICO' }).click(); await p.waitForTimeout(900);
+  await irA('OSPEVIC'); await p.waitForTimeout(900);
+  await irA('SUVICO'); await p.waitForTimeout(900);
   ok(await p.locator('.punto').count() === 0, 'miradas las dos conversaciones, no queda ningún punto');
   // Ponerse al día: el marco se recarga y vuelve a quedar igual
   const antesCfg = pedidos.config;

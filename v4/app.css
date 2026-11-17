@@ -1,0 +1,569 @@
+/*
+ * Web app del grupo, versión 4: «bosque y lima». Teléfono primero.
+ *
+ * Toma el lenguaje de FitApp (y con él, los colores de temacy.ar): verde bosque para lo que
+ * encuadra (la barra de arriba, la navegación, la pieza del campo de consulta), lima para la
+ * acción y lo elegido, hueso de fondo y tarjetas claras con borde fino. Tipografía Inter, que va
+ * en la carpeta fuentes/ (licencia SIL Open Font License; no se le pide nada a otro sitio).
+ * El color de cada entidad sólo aparece en su logo.
+ *
+ * Movimiento: corto y preciso, como en una app. Los cambios de estado duran entre 120 y 200 ms;
+ * las entradas, hasta 450 ms con una curva que frena al llegar (--ease). Pasar de una vista a
+ * otra es una transición del navegador (::view-transition) que empuja de costado. Todo se apaga
+ * con «menos movimiento», y sin JavaScript no queda nada oculto.
+ */
+@font-face { font-family: "Inter"; src: url("fuentes/inter-latin-variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+
+:root {
+  color-scheme: light;
+  --bosque: #142118;
+  --deep: #0E1811;
+  --musgo: #2C4A2E;
+  --lima: #C8F24C;
+  --lima-hover: #B9E33A;
+  --hueso: #F7F5EE;
+  --muted: #A9B3A8;         /* texto secundario SOBRE OSCURO: no usar sobre hueso */
+  --panel: #1B2A1F;
+  --ink: #142118;
+  --ink-2: #4A5648;         /* texto secundario sobre claro: 7,6:1 sobre hueso */
+  --ink-3: #66725F;         /* el ejemplo del campo: 4,9:1 sobre la tarjeta */
+  --line: #E1E1D6;
+  --line-2: #CFD3C6;
+  --line-dark: #344238;
+  --surface: #FEFEFB;
+  --suave: #FBFCF6;         /* tarjeta destacada */
+  --danger: #A63B2D;
+  --danger-bg: #F8E7E2;
+  --danger-ink: #7A2A1F;
+
+  /* el color de una entidad: lo pone app.js en su logo */
+  --marca: var(--bosque);
+  --marca-tinta: var(--lima);
+
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --radius: 14px;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --borde: 16px;            /* el aire a los costados */
+  --tope: 60px;             /* alto de la barra de arriba */
+  --barra: 68px;            /* alto de la navegación de abajo */
+  --lateral: 248px;         /* ancho del menú en pantalla grande */
+  --z-pestanas: 10;
+  --z-globo: 20;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; background: var(--bosque); }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  background: var(--hueso);
+  color: var(--ink);
+  font: 400 .9375rem/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; touch-action: manipulation; }
+h1, h2, p, ul { margin: 0; }
+ul { padding: 0; list-style: none; }
+:focus-visible { outline: 2px solid var(--bosque); outline-offset: 3px; border-radius: 6px; }
+.tope :focus-visible, .pestanas :focus-visible, .heroe :focus-visible { outline-color: var(--lima); }
+::selection { background: var(--lima); color: var(--bosque); }
+.solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sin-js { padding: 24px; color: var(--ink-2); }
+
+/* ── El armazón ────────────────────────────────────────────────────────────────────────────────
+   Ocupa exactamente lo que se ve. «--alto» lo escribe app.js cuando se abre el teclado del
+   teléfono, así el chat sube con el teclado en vez de quedar tapado.
+   De arriba abajo: aviso de conexión, barra de arriba, la escena (inicio o chat) y la navegación. */
+.app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: var(--alto, 100dvh);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: var(--hueso);
+}
+.aviso-red {
+  grid-row: 1;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  font-size: .875rem;
+  font-weight: 600;
+  text-align: center;
+}
+.tope {
+  grid-row: 2;
+  display: flex; align-items: center;
+  height: calc(var(--tope) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  border-bottom: 3px solid var(--lima);
+  background: var(--bosque);
+  color: var(--hueso);
+  view-transition-name: tope;
+}
+.aviso-red:not([hidden]) ~ .tope { height: var(--tope); padding-top: 0; }
+.marca { display: flex; align-items: center; gap: 10px; padding: 4px; font-size: 1.0625rem; font-weight: 700; letter-spacing: -.02em; }
+.marca svg { flex: none; }
+/* Con un chat a la vista (y con el teclado abierto) la barra de arriba se va: el chat ya dice con
+   quién se habla, y ese lugar le hace falta a la conversación. */
+.app:not([data-vista="inicio"]) .tope, .app.teclado .tope { display: none; }
+
+/* La escena: el inicio y los chats ocupan el mismo lugar y se ve uno. Tiene nombre para la
+   transición de una vista a otra. */
+.escena { grid-row: 3; position: relative; min-height: 0; view-transition-name: escena; }
+.inicio, .charlas { position: absolute; inset: 0; }
+.app:not([data-vista="inicio"]) .inicio { visibility: hidden; }
+.app[data-vista="inicio"] .charlas { visibility: hidden; }
+
+/* ── Inicio ───────────────────────────────────────────────────────────────────────────────── */
+.inicio { overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.ancho {
+  display: flex; flex-direction: column; gap: 20px;
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+  padding: 20px max(var(--borde), env(safe-area-inset-right)) 36px max(var(--borde), env(safe-area-inset-left));
+}
+.portada, .resultados { display: flex; flex-direction: column; gap: 20px; }
+.portada > section, .resultados > section, .tramo-temas { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dos, .lado { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.cabecera { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { color: var(--ink-2); font-size: .6875rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+h1 { font-size: clamp(1.75rem, 5vw, 2.125rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+/* Escribiendo, lo que importa es lo que aparece debajo del campo: el encabezado se corre. */
+.app.teclado .cabecera, .app.buscando .cabecera { display: none; }
+.app.teclado .ancho, .app.buscando .ancho { padding-top: 0; }      /* y la pieza del campo queda pegada a la barra */
+
+/* La pieza del campo de consulta: oscura y de lado a lado en el teléfono, como la foto de
+   portada de FitApp. Los tres logos flotan arriba a la derecha: dicen quiénes contestan. */
+.heroe {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-inline: calc(var(--borde) * -1);
+  padding: 22px 20px 24px;
+  background: var(--bosque);
+  color: var(--hueso);
+}
+.heroe::before {
+  content: "";
+  position: absolute; z-index: -1;
+  right: -110px; top: -150px;
+  width: 380px; height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(44, 74, 46, .95), rgba(44, 74, 46, 0));
+}
+.heroe .eyebrow { color: var(--lima); }
+.heroe-nota { color: #DCE1D8; font-size: .875rem; }
+.heroe-quienes { position: absolute; right: 18px; top: 15px; display: flex; gap: 5px; }
+.heroe-quienes .avatar {
+  width: 30px; height: 30px;
+  border: 0; border-radius: 9px;
+  box-shadow: 0 0 0 2px var(--bosque);
+  font-size: .8125rem;
+  animation: flota 5.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -1.5s);
+}
+.heroe-quienes .avatar img { padding: 3px; }
+@keyframes flota { 50% { transform: translateY(-4px); } }
+.app.buscando .heroe .eyebrow, .app.buscando .heroe-nota, .app.buscando .heroe-quienes,
+.app.teclado .heroe .eyebrow, .app.teclado .heroe-nota, .app.teclado .heroe-quienes { display: none; }
+.app:not([data-vista="inicio"]) .heroe-quienes .avatar { animation-play-state: paused; }   /* lo que no se ve no se mueve */
+
+.consulta { position: relative; }
+.consulta input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 52px 0 46px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 1rem/1.2 var(--sans);
+  transition: border-color .16s ease-out, box-shadow .16s ease-out;
+}
+.consulta input::placeholder { color: var(--ink-3); opacity: 1; }
+.consulta input:focus-visible { outline: none; border-radius: 12px; border-color: var(--lima); box-shadow: 0 0 0 4px rgba(200, 242, 76, .28); }
+.consulta-lupa { position: absolute; left: 14px; top: 17px; color: var(--ink-2); pointer-events: none; }
+.consulta-borrar {
+  position: absolute; right: 5px; top: 5px;
+  display: grid; place-items: center;
+  width: 44px; height: 44px;
+  border: 0; border-radius: 10px;
+  background: transparent; color: var(--ink-2);
+  cursor: pointer;
+  transition: background-color .16s ease-out, transform .12s ease-out;
+}
+.consulta-borrar:active { transform: scale(.92); }
+@media (hover: hover) { .consulta-borrar:hover { background: var(--hueso); } }
+/* Los ejemplos que van pasando por el campo vacío (los pone app.js). */
+.consulta-ejemplo {
+  position: absolute; left: 46px; right: 52px; top: 0;
+  display: flex; align-items: center;
+  height: 54px;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 1rem; font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.consulta-ejemplo > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; animation: ejemplo .42s var(--ease) both; }
+.consulta.con-texto .consulta-ejemplo { display: none; }
+@keyframes ejemplo { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@keyframes entra { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* La entrada de la primera vez: encabezado, campo y las tres entidades, escalonados y rápido. */
+.estreno .cabecera { animation: entra .42s var(--ease) both; }
+.estreno .heroe { animation: entra .46s var(--ease) .06s both; }
+.estreno .tramo-puertas .rotulo { animation: entra .42s var(--ease) .14s both; }
+.estreno .puertas > li { animation: entra .42s var(--ease) both; animation-delay: calc(.18s + var(--i, 0) * .055s); }
+/* Lo que aparece al escribir (y el inicio al volver de ahí) entra de una vez, sin escalonar:
+   las filas se rehacen con cada letra. */
+.resultados, .portada { animation: entra .28s var(--ease) both; }
+.estreno .portada { animation: none; }
+
+.rotulo { font-size: 1.1875rem; font-weight: 650; letter-spacing: -.025em; line-height: 1.2; }
+.nota { max-width: 60ch; color: var(--ink-2); font-size: .8125rem; text-wrap: pretty; }
+/* La nota de privacidad: una tarjeta con su marca de «cuidado», como los estados de FitApp. */
+.nota.privada {
+  display: flex; align-items: flex-start; gap: 12px;
+  max-width: none;
+  padding: 16px 18px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink); font-size: .875rem; font-weight: 500;
+}
+.nota.privada svg { flex: none; color: var(--musgo); }
+
+/* ── Las filas ────────────────────────────────────────────────────────────────────────────────
+   Dos presentaciones de lo mismo:
+     .puertas  cada fila es una tarjeta (las entidades), como los accesos de FitApp;
+     .lista    las filas van juntas en una tarjeta, separadas por renglones (temas y preguntas). */
+.filas { display: grid; gap: 10px; }
+.fila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease-out, background-color .16s ease-out, transform .16s ease-out;
+}
+.fila:active { transform: scale(.985); transition-duration: .1s; }
+@media (hover: hover) {
+  .fila:hover { border-color: var(--bosque); }
+  .fila:hover .fila-flecha { transform: translateX(3px); color: var(--bosque); }
+}
+.fila[aria-disabled="true"] { cursor: default; transform: none; border-color: var(--line); }
+.fila[aria-disabled="true"] > * { opacity: .5; }
+.fila-texto { display: grid; gap: 2px; min-width: 0; }
+.fila-nombre { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 1rem; font-weight: 650; letter-spacing: -.01em; line-height: 1.3; }
+/* «El sindicato», «Te atiende Ana»: una etiqueta. */
+.fila-que {
+  max-width: 100%; overflow: hidden;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--hueso);
+  color: var(--musgo);
+  font-size: .6875rem; font-weight: 600; letter-spacing: 0; line-height: 1.3;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.fila-previa {
+  color: var(--ink-2);
+  font-size: .8125rem;
+  line-height: 1.4;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.fila.con-novedad { border-color: var(--musgo); background: var(--suave); }
+.fila.con-novedad .fila-previa { color: var(--ink); font-weight: 600; }
+.fila-meta { display: grid; justify-items: end; gap: 4px; color: var(--ink-2); font-size: .75rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fila-flecha { display: grid; color: var(--ink-2); transition: transform .16s ease-out, color .16s ease-out; }
+
+.lista { gap: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.lista > li + li { border-top: 1px solid var(--line); }
+.lista .fila { min-height: 64px; padding: 12px 16px; border: 0; border-radius: 0; background: none; }
+.lista .fila:active { background: #EEF0E6; transform: none; }
+@media (hover: hover) { .lista .fila:hover { background: var(--hueso); } }
+/* Una pregunta (del buscador o de un tema) y un tema del inicio. */
+.fila-pregunta { grid-template-columns: minmax(0, 1fr) auto; }
+.fila-pregunta .fila-nombre { display: block; font-size: .9375rem; font-weight: 600; }
+.fila-situacion .fila-nombre { display: block; }
+.fila-pregunta .fila-previa, .fila-situacion .fila-previa { display: flex; align-items: center; gap: 6px; }
+.fila-ic { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 12px; background: var(--bosque); color: var(--lima); }
+
+.avatar {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; flex: none;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--marca);
+  color: var(--marca-tinta);
+  font-size: 1.125rem; font-weight: 700;
+}
+/* Con logo el fondo es claro (los logos vienen pensados para eso) y lleva un borde fino. */
+.avatar img { width: 100%; height: 100%; object-fit: contain; padding: 4px; background: #FEFEFB; }
+.avatar.con-logo { border: 1px solid var(--line); background: #FEFEFB; }
+.avatar.chico { width: 26px; height: 26px; border-radius: 8px; font-size: .8125rem; }
+.avatar.chico img { padding: 2px; }
+.avatar.minimo { width: 22px; height: 22px; border-radius: 6px; font-size: .6875rem; }
+.avatar.minimo img { padding: 1px; }
+
+/* «Hay algo nuevo». En las filas es una etiqueta lima que lo dice con una palabra (un punto lima
+   sobre claro casi no se ve); en la navegación, que es oscura, un punto lima que late.
+   Sin número a propósito: el chat parte una respuesta larga en varias burbujas. */
+.punto { display: block; padding: 2px 8px; border-radius: 6px; background: var(--lima); }
+.punto::after { content: "Nuevo"; color: var(--bosque); font-size: .6875rem; font-weight: 700; line-height: 1.4; }
+.pestana .punto { position: absolute; top: 9px; left: 50%; width: 10px; height: 10px; margin-left: 9px; padding: 0; border-radius: 50%; box-shadow: 0 0 0 2px var(--bosque); animation: late 1.6s ease-in-out infinite; }
+.pestana .punto::after { content: none; }
+@keyframes late { 50% { opacity: .35; } }
+
+/* ── Lo más pedido: los botones de arranque que cada entidad ya tiene en su chat ────────────
+   Un renglón por entidad que se desliza de costado, como los filtros de FitApp. */
+.temas-lista { display: grid; gap: 8px; }
+.temas-fila {
+  display: flex; gap: 8px;
+  margin: -4px calc(var(--borde) * -1);
+  padding: 4px var(--borde);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--borde);
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--borde), #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--borde), #000 calc(100% - 36px), transparent);
+}
+.temas-fila::-webkit-scrollbar { display: none; }
+.tema {
+  flex: none;
+  scroll-snap-align: start;
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .8125rem; font-weight: 550; line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out, transform .12s ease-out;
+}
+.tema:active { transform: scale(.97); background: var(--bosque); border-color: var(--bosque); color: var(--hueso); }
+@media (hover: hover) { .tema:hover { border-color: var(--bosque); } }
+.enviada { padding: 2px 8px; border-radius: 6px; background: var(--musgo); color: var(--hueso); font-size: .75rem; font-weight: 600; }
+
+/* ── Cajas del inicio: instalar (la tarjeta destacada) y confirmar el borrado ───────────────── */
+.caja { display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.caja p { font-size: .875rem; color: var(--ink-2); text-wrap: pretty; }
+.caja-acciones { display: flex; flex-wrap: wrap; gap: 10px; }
+.caja.destacada { border-color: var(--musgo); background: var(--suave); }
+.caja.destacada p { color: var(--ink); font-size: 1.0625rem; font-weight: 650; letter-spacing: -.02em; line-height: 1.3; }
+.olvidar { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.olvidar > .boton-llano { align-self: flex-start; min-height: 44px; padding-inline: 8px; border-color: transparent; background: transparent; color: var(--danger); }
+#olvidar-ok { border-color: var(--danger); background: var(--danger); color: #FFFDFB; }
+.boton, .boton-llano {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 10px 18px;
+  border: 1px solid transparent; border-radius: 10px;
+  font-size: .875rem; font-weight: 600; white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .16s ease-out, border-color .16s ease-out, transform .12s ease-out;
+}
+.boton { border-color: var(--lima); background: var(--lima); color: var(--bosque); }
+.boton-llano { border-color: var(--line); background: var(--surface); color: var(--bosque); }
+.boton:active, .boton-llano:active { transform: translateY(1px); }
+@media (hover: hover) {
+  .boton:hover { border-color: var(--lima-hover); background: var(--lima-hover); }
+  #olvidar-ok:hover { border-color: #8E3023; background: #8E3023; }
+  .boton-llano:hover { border-color: var(--bosque); }
+  .olvidar > .boton-llano:hover { border-color: transparent; background: var(--danger-bg); }
+}
+
+/* ── Los chats ────────────────────────────────────────────────────────────────────────────────
+   Todos los marcos tienen siempre el tamaño completo aunque no se vean (así el chat de adentro
+   sigue funcionando); se ve uno solo. En el teléfono el chat va de borde a borde. */
+.marcos { position: absolute; top: env(safe-area-inset-top); right: env(safe-area-inset-right); bottom: 0; left: env(safe-area-inset-left); }
+.marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; background: var(--hueso); }
+.marco.activo { visibility: visible; }
+
+/* ── Navegación de abajo (teléfono) ───────────────────────────────────────────────────────── */
+.pestanas {
+  grid-row: 4;
+  position: relative;
+  z-index: var(--z-pestanas);
+  display: flex;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  border-top: 1px solid var(--line-dark);
+  background: var(--bosque);
+  view-transition-name: pestanas;
+}
+/* Con el teclado abierto la navegación se va: ese lugar es de la conversación. */
+.app.teclado .pestanas { display: none; }
+.pestanas-marca { display: none; }
+.pestana {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px;
+  min-height: var(--barra);
+  padding: 6px 2px;
+  color: var(--muted);
+  font-size: .65625rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color .16s ease-out;
+}
+.pestana .nombre { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pestana[aria-current="page"] { color: var(--lima); font-weight: 650; }
+.pestana[aria-disabled="true"] { opacity: .45; cursor: default; }
+.pestana .icono { display: grid; place-items: center; width: 26px; height: 26px; transition: transform .2s var(--ease); }
+.pestana:active .icono { transform: scale(.88); }
+.pestana:not([aria-current="page"]) .avatar { opacity: .82; }
+.pestana:focus-visible { outline-offset: -4px; border-radius: 10px; }
+/* La luz que marca dónde se está: una raya lima que se desliza (app.js le dice dónde va). */
+.pestanas-luz {
+  position: absolute;
+  top: -1px; left: 0;
+  width: 32px; height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--lima);
+  opacity: 0;
+  transform: translateX(calc(var(--luz-x, 0px) + var(--luz-w, 0px) / 2 - 16px));
+  pointer-events: none;
+  view-transition-name: luz;
+}
+.pestanas.con-luz .pestanas-luz { opacity: 1; }
+.pestanas.asentada .pestanas-luz { transition: transform .28s var(--ease); }
+
+/* ── Avisos que aparecen arriba un momento ────────────────────────────────────────────────────
+   «Te contestaron» es una píldora lima con su punto que late, como la sesión en curso de FitApp;
+   las notas de la app, un cartel oscuro. */
+.globo {
+  position: absolute;
+  z-index: var(--z-globo);
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  translate: -50% 0;
+  width: max-content;
+  max-width: min(92%, 440px);
+  display: flex; align-items: center; gap: 10px;
+  min-height: 48px; margin: 0; padding: 8px 18px 8px 8px;
+  border: 0; border-radius: 999px;
+  background: var(--lima); color: var(--bosque);
+  box-shadow: 0 8px 24px rgba(14, 24, 17, .25);
+  font-size: .875rem; font-weight: 600; line-height: 1.35; text-align: left;
+  cursor: pointer;
+  animation: globo-entra .22s var(--ease) both;
+}
+.app[data-vista="inicio"]:not(.teclado) .globo { top: calc(var(--tope) + 15px + env(safe-area-inset-top)); }
+.globo .avatar { border-color: transparent; }
+.globo::after { content: ""; flex: none; width: 8px; height: 8px; margin-left: 2px; border-radius: 50%; background: currentColor; animation: late 1.6s ease-in-out infinite; }
+.globo.nota-app { padding: 12px 18px; border-radius: 12px; background: var(--bosque); color: var(--hueso); box-shadow: 0 10px 30px rgba(14, 24, 17, .3); font-weight: 500; cursor: default; }
+.globo.nota-app::after { content: none; }
+@keyframes globo-entra { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+
+/* ── Entrar al desplazar (lo enciende movimiento.js) ──────────────────────────────────────── */
+.espera { opacity: 0; transform: translateY(16px); }
+.espera.visto { opacity: 1; transform: none; transition: opacity .45s var(--ease), transform .45s var(--ease); transition-delay: var(--demora, 0ms); }
+
+/* ── Pasar de una vista a otra ────────────────────────────────────────────────────────────────
+   La escena empuja de costado, como al navegar en una app: entrar a un chat viene de la derecha,
+   volver al inicio se va hacia allá. «data-ir» (lo pone app.js) dice hacia dónde. La barra de
+   arriba aparece y desaparece fundida; la navegación queda en su lugar y su raya se desliza. */
+::view-transition-group(escena) { animation-duration: .3s; animation-timing-function: var(--ease); }
+::view-transition-old(escena) { mix-blend-mode: normal; animation: vt-sale-izq .18s ease-out both; }
+::view-transition-new(escena) { mix-blend-mode: normal; animation: vt-entra-der .32s var(--ease) both; }
+html[data-ir="volver"]::view-transition-old(escena), html[data-ir="izq"]::view-transition-old(escena) { animation-name: vt-sale-der; }
+html[data-ir="volver"]::view-transition-new(escena), html[data-ir="izq"]::view-transition-new(escena) { animation-name: vt-entra-izq; }
+::view-transition-group(luz) { animation-duration: .28s; animation-timing-function: var(--ease); }
+::view-transition-group(pestanas), ::view-transition-group(tope) { animation-duration: .2s; }
+@keyframes vt-sale-izq { to { opacity: 0; transform: translateX(-16px); } }
+@keyframes vt-entra-der { from { opacity: 0; transform: translateX(28px); } }
+@keyframes vt-sale-der { to { opacity: 0; transform: translateX(16px); } }
+@keyframes vt-entra-izq { from { opacity: 0; transform: translateX(-28px); } }
+html:not(.con-vt) .marco.activo { animation: entra .28s var(--ease) both; }
+
+/* ── Pantalla mediana: las tres entidades en fila ─────────────────────────────────────────── */
+@media (min-width: 640px) {
+  #conversaciones { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #conversaciones .fila { align-content: center; }
+}
+
+/* ── Pantalla grande ──────────────────────────────────────────────────────────────────────────
+   La navegación pasa al costado y lleva la marca; la barra de arriba no hace falta. El contenido
+   respira: la pieza del campo tiene esquinas, y «Por tema» comparte renglón con lo demás. */
+@media (min-width: 960px) {
+  :root { --borde: 48px; }
+  .app { grid-template-columns: var(--lateral) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .aviso-red { grid-column: 1 / -1; }
+  .tope { display: none; }
+  .escena { grid-column: 2; grid-row: 2; }
+  .pestanas {
+    grid-column: 1; grid-row: 2;
+    flex-direction: column; gap: 4px;
+    padding: calc(22px + env(safe-area-inset-top)) 16px 22px;
+    border-top: 0;
+  }
+  .pestanas-marca { display: flex; align-items: center; gap: 10px; padding: 0 4px 22px; color: var(--hueso); font-size: 1.0625rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .pestanas-marca svg { flex: none; }
+  .pestana {
+    flex: none; flex-direction: row; justify-content: flex-start;
+    gap: 12px;
+    min-height: 46px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: .875rem;
+    transition: background-color .16s ease-out, color .16s ease-out;
+  }
+  .pestana[aria-current="page"] { background: var(--panel); font-weight: 600; }
+  @media (hover: hover) { .pestana:not([aria-disabled="true"]):hover { background: var(--panel); color: var(--hueso); } .pestana[aria-current="page"]:hover { color: var(--lima); } }
+  .pestana > span:not(.icono):not(.nombre) { margin-left: auto; }   /* el aviso de «hay algo nuevo», a la derecha */
+  .pestana .punto { position: static; margin: 0; box-shadow: none; }
+  .pestanas-luz { top: 0; left: 0; width: 3px; height: 22px; border-radius: 0 3px 3px 0; transform: translateY(calc(var(--luz-y, 0px) + var(--luz-h, 0px) / 2 - 11px)); }
+
+  .ancho { gap: 24px; padding-top: 40px; padding-bottom: 64px; }
+  .portada, .resultados { gap: 24px; }
+  .app.teclado .cabecera, .app.buscando .cabecera { display: flex; }
+  .heroe { margin-inline: 0; padding: 40px 44px 44px; border-radius: 18px; gap: 14px; }
+  .heroe::before { right: -60px; top: -180px; width: 620px; height: 620px; }
+  .heroe .consulta { max-width: 560px; }
+  /* Los tres logos, grandes y apenas torcidos, como tarjetas apoyadas sobre la pieza. */
+  .heroe-quienes { right: 52px; top: 50%; gap: 0; translate: 0 -50%; }
+  .heroe-quienes .avatar { width: 76px; height: 76px; margin-left: -8px; border-radius: 18px; box-shadow: 0 0 0 4px var(--bosque), 0 18px 40px -18px rgba(0, 0, 0, .7); font-size: 1.5rem; rotate: -5deg; }
+  .heroe-quienes .avatar:nth-child(2) { margin-top: 30px; rotate: 4deg; }
+  .heroe-quienes .avatar:nth-child(3) { margin-top: -8px; rotate: -2deg; }
+  .heroe-quienes .avatar img { padding: 8px; }
+  .app.buscando .heroe .eyebrow, .app.buscando .heroe-nota, .app.buscando .heroe-quienes { display: revert; }
+  .app.buscando .heroe-quienes { display: flex; }
+  .resultados { max-width: 760px; }
+  .temas-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+  .temas-fila { display: contents; }
+  .dos { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); align-items: start; gap: 24px; }
+  .lado { padding-top: 35px; }      /* alinea con la tarjeta de «Por tema», debajo de su título */
+  .marcos { top: 24px; right: 32px; bottom: 24px; left: 32px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+  .globo, .app[data-vista="inicio"]:not(.teclado) .globo { top: 20px; left: calc(var(--lateral) + (100% - var(--lateral)) / 2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .espera { opacity: 1; transform: none; }
+}

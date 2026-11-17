@@ -1,5 +1,6 @@
 /*
- * Recorrido completo de la v2: inicio, buscador, temas, chats, avisos de respuesta, sin conexión, borrar conversaciones, escritorio.
+ * Recorrido completo (v2, v3 y v4): inicio, buscador, temas, chats, avisos de respuesta, sin conexión, borrar conversaciones, escritorio.
+ * La versión se detecta sola por la URL que se le pasa (v2 :4520, v3 :4530, v4 :4540).
  * Con el argumento `rapido` no manda mensajes (no gasta IA).
  *
  * Es una prueba COMO USUARIO: abre la app en un navegador de verdad, toca, escribe y mira qué pasa.
@@ -49,6 +50,10 @@ async function esperarRespuesta(p, slug, antes) {
   await p.waitForSelector('#conversaciones .fila');
   await p.waitForLoadState('networkidle');
   await p.waitForTimeout(900);
+  // Qué versión se está probando. Desde la 3 se ve una cosa por vez también en pantalla grande
+  // (las pestañas hacen de menú) y el chat puede ir enmarcado: cambian dos comprobaciones.
+  const V = await p.evaluate(() => (window.Comun && window.Comun.VERSION) || 2);
+  console.log('  versión ' + V);
   ok(await p.locator('#conversaciones .fila').count() === 3, 'tres filas de «con quién hablar»');
   ok((await p.locator('#conv-rotulo').innerText()).toUpperCase() === 'CON QUIÉN HABLAR', 'sin conversaciones el rótulo dice «Con quién hablar»');
   ok(await p.locator('#pedidos .tema').count() >= 4, `«lo más pedido» trae los botones de los chats (${await p.locator('#pedidos .tema').count()})`);
@@ -97,7 +102,9 @@ async function esperarRespuesta(p, slug, antes) {
     await p.waitForTimeout(1200);
     const caja = await p.locator('iframe.marco.activo').boundingBox();
     const barra = await p.locator('#pestanas').boundingBox();
-    ok(caja && barra && Math.abs(caja.y + caja.height - barra.y) < 2 && caja.y === 0, `el chat ocupa de arriba hasta las pestañas (chat ${Math.round(caja.height)} + pestañas ${Math.round(barra.height)})`);
+    // Hasta la v2 el chat va de borde a borde; desde la 3 puede llevar un marco fino alrededor.
+    const aire = caja && barra ? barra.y - (caja.y + caja.height) : 99;
+    ok(caja && barra && (V >= 3 ? caja.y >= 0 && caja.y <= 12 && aire >= -1 && aire <= 16 : Math.abs(aire) < 2 && caja.y === 0), `el chat ocupa de arriba hasta las pestañas (chat ${Math.round(caja.height)} + pestañas ${Math.round(barra.height)})`);
     ok(await p.locator('.pestana[aria-current="page"]').innerText() === 'OSPEVIC', 'la pestaña marcada es OSPEVIC');
     ok(!(await marco(p, 'ospevic').locator('.wcw-btn').isVisible()) && !(await marco(p, 'ospevic').locator('.wcw-x').isVisible()), 'sin botón redondo ni cruz');
     ok((await marco(p, 'ospevic').locator('.wcw-m.visitor').first().innerText()).includes('urgencia'), 'la pregunta se mandó sola');
@@ -200,6 +207,39 @@ async function esperarRespuesta(p, slug, antes) {
   console.log('ESCRITORIO 1366×768');
   ({ c, p, reg } = await contexto(b, { viewport: { width: 1366, height: 768 } }));
   await p.goto(URL0); await p.waitForSelector('#conversaciones .fila'); await p.waitForLoadState('networkidle'); await p.waitForTimeout(600);
+  if (V >= 3) {
+    // Desde la v3: una cosa por vez también acá, y las pestañas son el menú.
+    ok(await p.locator('#pestanas').isVisible() && await p.locator('.pestana').count() === 4, 'en pantalla grande las pestañas son el menú');
+    ok(await p.locator('#inicio').isVisible() && await p.locator('iframe.marco').count() === 0, 'y el inicio ocupa la pantalla, sin ningún chat abierto');
+    ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'sin desplazamiento horizontal');
+    await foto(p, '13-escritorio-inicio');
+    // Escribir en el inicio mientras un chat carga de fondo: no se roba el foco
+    await p.locator('#consulta-campo').click();
+    await p.keyboard.type('sub');
+    await p.evaluate(() => { const f = document.createElement('iframe'); f.className = 'marco'; f.setAttribute('inert', ''); f.src = 'charla.html?e=suvico'; document.getElementById('marcos').appendChild(f); });
+    await p.frameLocator('iframe.marco[src="charla.html?e=suvico"]').locator('.wcw-panel.wcw-on').waitFor({ timeout: 20000 });
+    await p.waitForTimeout(600);
+    await p.keyboard.type('sidio');
+    ok(await p.locator('#consulta-campo').inputValue() === 'subsidio', 'un chat que carga de fondo no le saca el foco a lo que se está escribiendo');
+    await foto(p, '14-escritorio-buscar');
+    await p.locator('#consulta-borrar').click();
+    await p.locator('#conversaciones .fila', { hasText: 'Mavic' }).click();
+    await marco(p, 'mavic').locator('.wcw-panel.wcw-on').waitFor({ timeout: 20000 });
+    await p.waitForTimeout(1500);
+    ok(await p.locator('#inicio').isHidden() && await p.locator('iframe.marco.activo').isVisible(), 'al elegir una conversación se ve el chat y el inicio se va');
+    ok(await p.locator('.pestana[aria-current="page"]').innerText() === 'Mavic', 'la pestaña marcada es Mavic');
+    const foco3 = await p.evaluate(() => { const a = document.activeElement; return a && a.tagName === 'IFRAME' ? a.contentDocument.activeElement.tagName + ':' + (a.contentDocument.activeElement.placeholder || '') : (a && a.tagName); });
+    ok(/INPUT/.test(foco3), 'el foco queda en el campo del chat, listo para escribir (' + foco3 + ')');
+    await foto(p, '15-escritorio-chat');
+    await p.goBack();
+    await p.waitForTimeout(700);
+    ok(!p.url().includes(String.fromCharCode(63) + 'e=') && await p.locator('#inicio').isVisible(), 'en escritorio, «atrás» vuelve al inicio');
+    ok(reg.errores.length === 0, 'sin errores de consola' + (reg.errores.length ? ': ' + reg.errores.slice(0, 3).join(' | ') : ''));
+    await c.close();
+    await b.close();
+    console.log(fallas.length ? `\n${fallas.length} FALLA(S):\n - ` + fallas.join('\n - ') : '\nTodo en verde.');
+    process.exit(fallas.length ? 1 : 0);
+  }
   ok(await p.locator('#pestanas').isHidden(), 'en pantalla ancha no hay pestañas: el inicio queda de columna');
   ok(await p.locator('#vacio').isVisible(), 'y a la derecha, sin nada elegido, una invitación');
   await foto(p, '13-escritorio-inicio');
