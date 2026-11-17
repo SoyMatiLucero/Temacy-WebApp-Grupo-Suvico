@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Web app del grupo — versiones lado a lado</title>
+  <style>
+    /* Página de trabajo para comparar versiones. No se publica. */
+    :root { color-scheme: light dark; --fondo: #eceae4; --tinta: #16202b; --suave: #5a6673; --linea: #d3cfc4; --tarjeta: #fff; }
+    @media (prefers-color-scheme: dark) { :root { --fondo: #0b0f14; --tinta: #eef1f4; --suave: #a3adb8; --linea: #2a3542; --tarjeta: #18202a; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--fondo); color: var(--tinta); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; border-bottom: 1px solid var(--linea); }
+    h1 { margin: 0; font-size: 17px; }
+    .controles { display: flex; gap: 6px; margin-left: auto; }
+    button { min-height: 36px; padding: 6px 14px; border: 1px solid var(--linea); border-radius: 10px; background: var(--tarjeta); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+    button[aria-pressed="true"] { background: var(--tinta); color: var(--fondo); border-color: var(--tinta); }
+    main { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; padding: 24px 20px 40px; }
+    figure { margin: 0; display: grid; gap: 10px; justify-items: center; }
+    figcaption { display: flex; align-items: baseline; gap: 12px; font-weight: 800; font-size: 16px; }
+    figcaption a { color: var(--suave); font-weight: 600; font-size: 13px; }
+    iframe { display: block; border: 1px solid var(--linea); background: var(--tarjeta); box-shadow: 0 12px 40px rgba(0, 0, 0, .14); }
+    main[data-modo="telefono"] iframe { width: 390px; height: 800px; border-radius: 28px; }
+    main[data-modo="escritorio"] { flex-direction: column; align-items: center; }
+    main[data-modo="escritorio"] iframe { width: min(1280px, calc(100vw - 40px)); height: 720px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Web app del grupo — versiones lado a lado</h1>
+    <div class="controles" role="group" aria-label="Tamaño de pantalla">
+      <button type="button" data-modo="telefono" aria-pressed="true">Teléfono</button>
+      <button type="button" data-modo="escritorio" aria-pressed="false">Escritorio</button>
+      <button type="button" id="recargar">Recargar las dos</button>
+    </div>
+  </header>
+  <main id="marcos" data-modo="telefono"></main>
+
+  <script src="/versiones.js"></script>
+  <script>
+    (function () {
+      var marcos = document.getElementById('marcos');
+      (window.VERSIONES || []).forEach(function (v) {
+        var url = location.protocol + '//' + location.hostname + ':' + v.puerto + '/';
+        var fig = document.createElement('figure');
+        var cap = document.createElement('figcaption');
+        cap.appendChild(document.createTextNode(v.nombre));
+        var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'abrir sola ↗';
+        cap.appendChild(a);
+        var f = document.createElement('iframe');
+        f.src = url; f.title = 'Versión ' + v.nombre; f.allow = 'microphone; clipboard-write';
+        fig.appendChild(cap); fig.appendChild(f); marcos.appendChild(fig);
+      });
+      document.querySelectorAll('button[data-modo]').forEach(function (b) {
+        b.onclick = function () {
+          marcos.setAttribute('data-modo', b.getAttribute('data-modo'));
+          document.querySelectorAll('button[data-modo]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+        };
+      });
+      document.getElementById('recargar').onclick = function () {
+        marcos.querySelectorAll('iframe').forEach(function (f) { f.src = f.src; });
+      };
+    }());
+  </script>
+</body>
+</html>
