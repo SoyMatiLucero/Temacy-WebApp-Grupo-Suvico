@@ -13,12 +13,15 @@
     body { margin: 0; min-height: 100vh; background: var(--fondo); color: var(--tinta); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
     header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; border-bottom: 1px solid var(--linea); }
     h1 { margin: 0; font-size: 17px; }
-    .controles { display: flex; gap: 6px; margin-left: auto; }
-    button { min-height: 36px; padding: 6px 14px; border: 1px solid var(--linea); border-radius: 10px; background: var(--tarjeta); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+    .controles { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+    .controles label { color: var(--suave); font-weight: 600; font-size: 13px; }
+    button, select { min-height: 36px; padding: 6px 14px; border: 1px solid var(--linea); border-radius: 10px; background: var(--tarjeta); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
     button[aria-pressed="true"] { background: var(--tinta); color: var(--fondo); border-color: var(--tinta); }
+    .separa { width: 1px; height: 24px; margin: 0 6px; background: var(--linea); }
     main { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; padding: 24px 20px 40px; }
     figure { margin: 0; display: grid; gap: 10px; justify-items: center; }
     figcaption { display: flex; align-items: baseline; gap: 12px; font-weight: 800; font-size: 16px; }
+    figcaption small { color: var(--suave); font-weight: 600; font-size: 13px; }
     figcaption a { color: var(--suave); font-weight: 600; font-size: 13px; }
     iframe { display: block; border: 1px solid var(--linea); background: var(--tarjeta); box-shadow: 0 12px 40px rgba(0, 0, 0, .14); }
     main[data-modo="telefono"] iframe { width: 390px; height: 800px; border-radius: 28px; }
@@ -29,7 +32,12 @@
 <body>
   <header>
     <h1>Web app del grupo — versiones lado a lado</h1>
-    <div class="controles" role="group" aria-label="Tamaño de pantalla">
+    <div class="controles">
+      <label for="izq">Comparar</label>
+      <select id="izq" aria-label="Versión de la izquierda"></select>
+      <label for="der">con</label>
+      <select id="der" aria-label="Versión de la derecha"></select>
+      <span class="separa" aria-hidden="true"></span>
       <button type="button" data-modo="telefono" aria-pressed="true">Teléfono</button>
       <button type="button" data-modo="escritorio" aria-pressed="false">Escritorio</button>
       <button type="button" id="recargar">Recargar las dos</button>
@@ -40,18 +48,43 @@
   <script src="/versiones.js"></script>
   <script>
     (function () {
-      var marcos = document.getElementById('marcos');
-      (window.VERSIONES || []).forEach(function (v) {
-        var url = location.protocol + '//' + location.hostname + ':' + v.puerto + '/';
-        var fig = document.createElement('figure');
-        var cap = document.createElement('figcaption');
-        cap.appendChild(document.createTextNode(v.nombre));
-        var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'abrir sola ↗';
-        cap.appendChild(a);
-        var f = document.createElement('iframe');
-        f.src = url; f.title = 'Versión ' + v.nombre; f.allow = 'microphone; clipboard-write';
-        fig.appendChild(cap); fig.appendChild(f); marcos.appendChild(fig);
+      // Qué es cada versión, para no tener que acordarse del número.
+      var QUE = { v1: 'tres tarjetas', v2: 'una app, sobria', v3: 'estilo Mavic, de noche', v4: 'estilo FitApp, bosque y lima' };
+      var versiones = window.VERSIONES || [], marcos = document.getElementById('marcos');
+      var izq = document.getElementById('izq'), der = document.getElementById('der');
+      function urlDe(v) { return location.protocol + '//' + location.hostname + ':' + v.puerto + '/'; }
+      function buscar(nombre) { for (var i = 0; i < versiones.length; i++) if (versiones[i].nombre === nombre) return versiones[i]; return null; }
+      [izq, der].forEach(function (sel) {
+        versiones.forEach(function (v) {
+          var o = document.createElement('option');
+          o.value = v.nombre; o.textContent = v.nombre + (QUE[v.nombre] ? ' · ' + QUE[v.nombre] : '');
+          sel.appendChild(o);
+        });
       });
+      // De entrada, las dos últimas (lo más nuevo). La elección se recuerda en la dirección.
+      var pedido = new URLSearchParams(location.search);
+      var n = versiones.length;
+      izq.value = buscar(pedido.get('a')) ? pedido.get('a') : (versiones[Math.max(0, n - 2)] || {}).nombre;
+      der.value = buscar(pedido.get('b')) ? pedido.get('b') : (versiones[n - 1] || {}).nombre;
+
+      function armar() {
+        marcos.textContent = '';
+        [izq.value, der.value].forEach(function (nombre) {
+          var v = buscar(nombre);
+          if (!v) return;
+          var url = urlDe(v);
+          var fig = document.createElement('figure'), cap = document.createElement('figcaption');
+          cap.appendChild(document.createTextNode(v.nombre));
+          if (QUE[v.nombre]) { var s = document.createElement('small'); s.textContent = QUE[v.nombre]; cap.appendChild(s); }
+          var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'abrir sola ↗';
+          cap.appendChild(a);
+          var f = document.createElement('iframe');
+          f.src = url; f.title = 'Versión ' + v.nombre; f.allow = 'microphone; clipboard-write';
+          fig.appendChild(cap); fig.appendChild(f); marcos.appendChild(fig);
+        });
+        history.replaceState(null, '', '?a=' + izq.value + '&b=' + der.value);
+      }
+      izq.onchange = der.onchange = armar;
       document.querySelectorAll('button[data-modo]').forEach(function (b) {
         b.onclick = function () {
           marcos.setAttribute('data-modo', b.getAttribute('data-modo'));
@@ -61,6 +94,7 @@
       document.getElementById('recargar').onclick = function () {
         marcos.querySelectorAll('iframe').forEach(function (f) { f.src = f.src; });
       };
+      armar();
     }());
   </script>
 </body>

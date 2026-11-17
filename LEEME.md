@@ -7,7 +7,11 @@ Cada versión vive en su carpeta, para poder compararlas:
 | Carpeta | Qué es |
 |---|---|
 | `v1/` | La primera versión (17-11-2026): tres tarjetas y, al elegir una, el chat de esa entidad. Queda congelada como punto de comparación y como plan B. |
-| `v2/` | La versión mejorada (17-11-2026): una sola app con los tres chats vivos adentro. Cómo está hecha: `v2/LEEME.md`. |
+| `v2/` | La versión mejorada (17-11-2026): una sola app con los tres chats vivos adentro. Cómo está hecha: `v2/LEEME.md`. Funciona bien pero no gustó cómo se ve: sobria y sin movimiento. |
+| `v3/` | Propuesta «de noche» (17-11-2026): la v2 con el estilo del sitio de Mavic y con movimiento. `v3/LEEME.md`. |
+| `v4/` | Propuesta «bosque y lima» (17-11-2026): la v2 con el estilo de FitApp y con movimiento. `v4/LEEME.md`. |
+
+La v3 y la v4 son la misma app por dentro (la lógica de la v2) con dos pieles distintas: hay que elegir una.
 
 ## Verlas en esta máquina
 
@@ -19,7 +23,9 @@ API=http://127.0.0.1:3110 node web_grupo/servidor-local.js
 
 - v1: `http://127.0.0.1:4510`
 - v2: `http://127.0.0.1:4520`
-- las dos lado a lado, como teléfono o como escritorio: `http://127.0.0.1:4505`
+- v3: `http://127.0.0.1:4530`
+- v4: `http://127.0.0.1:4540`
+- dos versiones lado a lado, como teléfono o como escritorio: `http://127.0.0.1:4505` (arranca con las dos últimas y deja elegir cuáles)
 
 Con `RED=1` adelante escucha también en la red local, para abrirla desde un teléfono (ahí no hay modo sin conexión ni micrófono: el navegador los reserva para https).
 
@@ -54,6 +60,20 @@ La v1 usa el chat de la plataforma tal cual, suelto en la página. En la v2 cada
 
 Si la prueba en teléfonos reales no convence, la v1 sigue siendo publicable, corrigiendo antes lo que sigue.
 
+## Qué cambia de la v2 a la v3 y la v4
+
+Por dentro, nada de fondo: son los mismos marcos, los mismos mensajes y las mismas reglas de privacidad. Cambia cómo se ve y cómo se mueve, y tres cosas de uso:
+
+| | v2 | v3 y v4 |
+|---|---|---|
+| **Cómo se ve** | Neutros claros, tipografía del sistema, sin marca. | v3: la noche y el turquesa del sitio de Mavic. v4: el bosque, la lima y el hueso de FitApp. Cada una con su tipografía. |
+| **Movimiento** | Ninguno. | Entrada al abrir, transición al pasar del inicio a un chat y entre chats, marca de pestaña que se desliza, ejemplos que rotan en el campo de consulta. La v3 suma cinta de texto y luces de fondo. Se apaga si la persona pidió menos movimiento. |
+| **En computadora** | El inicio como columna angosta y el chat al lado; sin chat elegido, media pantalla vacía. | Una cosa por vez, como en el teléfono, y las pestañas hacen de menú (arriba en la v3, al costado en la v4). |
+| **«Lo más pedido» en el teléfono** | Doce botones apilados. | Un renglón por entidad que se desliza de costado. |
+| **El campo de consulta** | «Escribí tu consulta». | Va mostrando preguntas de ejemplo de las tres entidades. |
+
+Lo que suman de costo: tipografías propias (unos 100 KB en la v3 y 48 KB en la v4, guardadas en el teléfono después de la primera vez) y un archivo más (`movimiento.js`). Las transiciones entre vistas usan una función del navegador que no está en todos: donde falta, el cambio es seco.
+
 ## Lo que la revisión encontró en la v1
 
 La v1 se revisó a fondo después de entregarla. Queda como estaba, para comparar; esto es lo que habría que corregirle si se la publicara. Diez defectos confirmados, del más al menos importante:
@@ -71,22 +91,23 @@ La v1 se revisó a fondo después de entregarla. Queda como estaba, para compara
 
 La v2 no tiene ninguno de los diez.
 
-## Para publicar (cualquiera de las dos)
+## Para publicar (cualquiera de ellas)
 
 1. **Subdominio y certificado.** Ojo: un subdominio que apunte a la máquina sin su bloque de nginx cae en el bloque general y muestra el panel de gestión.
 2. **nginx.** `nginx-subdominio.ejemplo.conf` es la propuesta, sin probar. Sirve la carpeta publicada, le reenvía a la API sólo el chat (`/api/web-chat/`, `/socket.io/`, `/widget.js`) y **redirige** al dominio de la plataforma lo que es contenido subido (`/uploads/`, `/brands/`, `/privacidad/`). Esto último es de seguridad y no hay que «simplificarlo»: en el dominio de la app quedan guardadas las credenciales de las tres conversaciones, y ahí no se sirve nada que haya subido nadie.
 3. **Guion de publicación** como `deploy/publicar-web.sh` (respaldo, checksums y verificación). Tiene que comprobar que estén todos los archivos de la lista de `sw.js`: si falta uno, los teléfonos no se actualizan.
-4. **Probar en teléfonos reales** (v2): teclado, micrófono, adjuntar, instalar.
+4. **Probar en teléfonos reales** (v2, v3 y v4): teclado, micrófono, adjuntar, instalar. En la v3 y la v4, además, las transiciones entre vistas en iPhone.
+5. **Tipografías de la v3:** confirmar la licencia antes de publicar (ver `v3/LEEME.md`).
 
 Lo que hay que resolver en la plataforma, que no es de la app, está en `docs/plan_webapp.md`, sección 9.
 
 ## Pruebas
 
-`pruebas/recorrido.js` y `pruebas/recorrido-delicado.js` recorren la v2 como un usuario, en un navegador de verdad (Playwright), en teléfono y en escritorio, mandando mensajes reales a los bots de la base local:
+`pruebas/recorrido.js` y `pruebas/recorrido-delicado.js` recorren la app como un usuario, en un navegador de verdad (Playwright), en teléfono y en escritorio, mandando mensajes reales a los bots de la base local. Sirven para la v2, la v3 y la v4: se les pasa la dirección y detectan la versión solas.
 
 ```
-PLAYWRIGHT=<carpeta de playwright> node web_grupo/pruebas/recorrido.js
-PLAYWRIGHT=<carpeta de playwright> node web_grupo/pruebas/recorrido-delicado.js
+PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node web_grupo/pruebas/recorrido.js
+PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node web_grupo/pruebas/recorrido-delicado.js
 ```
 
-Con `rapido` al final, el primero no manda mensajes. Cada corrida deja conversaciones de prueba en la base local.
+Sin `URL` prueban la v2. Con `rapido` al final, el primero no manda mensajes. Cada corrida deja conversaciones de prueba en la base local.
