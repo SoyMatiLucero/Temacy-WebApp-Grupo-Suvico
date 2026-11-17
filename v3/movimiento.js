@@ -82,6 +82,7 @@
     var CLAVE = (C && C.PRE ? C.PRE : 'grupo_') + 'cinta';
     function poner(pausada) {
       cinta.classList.toggle('pausada', pausada);
+      app.classList.toggle('adorno-quieto', pausada);     // las luces de fondo y los ejemplos del campo también paran
       boton.textContent = pausada ? 'Reanudar movimiento' : 'Pausar movimiento';
     }
     poner(!!C && C.leer(CLAVE) === 'pausada');

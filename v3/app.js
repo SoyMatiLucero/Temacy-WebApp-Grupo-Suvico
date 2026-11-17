@@ -371,11 +371,13 @@
   // Lo que hay que decirle a un marco cuando cambia la vista: si es el que se está viendo, si se
   // le da el foco (sólo en pantalla cómoda: en el teléfono eso abriría el teclado) y cómo está el
   // teclado. Esto es lógica y se hace en el momento.
-  function avisarSitio(e, conFoco) {
+  function avisarSitio(e, conFoco, focoDespues) {
     if (!e.marco) return;
     var si = vista === e.ent.slug;
     if (si && conFoco && !e.conectado) e.focoPendiente = true;
-    decir(e, { tipo: 'activar', activo: si, foco: si && !!conFoco && COMODA.matches });
+    // «focoDespues»: el foco se pide aparte, cuando el marco ya se ve (ver «mostrar»). Pedírselo
+    // antes es pedírselo a un marco todavía inerte, y sólo lo salvaban los reintentos.
+    decir(e, { tipo: 'activar', activo: si, foco: si && !!conFoco && !focoDespues && COMODA.matches });
     if (si) decir(e, { tipo: 'teclado', abierto: teclado });
   }
   // Y lo que se ve: cuál de los marcos está a la vista. Va aparte porque, cuando el cambio de
@@ -529,10 +531,15 @@
     var desde = vista;
     vista = v;
     if (e) asegurarMarco(e);
-    E.forEach(function (x) { avisarSitio(x, conFoco); });
+    E.forEach(function (x) { avisarSitio(x, conFoco, true); });
     if (e) { contarNovedad(e); ocultarNovedad(e); }
     pintarTitulo();
-    var pintarYSeguir = function () { pintarVista(); if (alTerminar) alTerminar(); };
+    var pintarYSeguir = function () {
+      pintarVista();
+      var actual = vista === 'inicio' ? null : porSlug(vista);
+      if (actual && conFoco && COMODA.matches) decir(actual, { tipo: 'activar', activo: true, foco: true });
+      if (alTerminar) alTerminar();
+    };
     if (animada) conMovimiento(desde, v, pintarYSeguir); else pintarYSeguir();
   }
   // Un toque de la persona. Entrar a un chat desde el inicio apila una entrada en el historial, así
@@ -556,7 +563,9 @@
   function acomodarFoco(desde, hacia) {
     var e = hacia === 'inicio' ? porSlug(desde) : porSlug(hacia), destino = null;
     if (!e) return;
-    if (hacia !== 'inicio') { if (COMODA.matches) return; destino = e.marco; }
+    // En pantalla cómoda, con el chat ya listo, el foco lo toma su campo. Si todavía carga (o no
+    // pudo abrir), se lo lleva al marco: si no quedaría en el inicio, que ya no se ve.
+    if (hacia !== 'inicio') { if (COMODA.matches && e.conectado && e.estadoMarco === 'listo') return; destino = e.marco; }
     else destino = $('portada').hidden ? $('consulta-borrar') : e.dom.fila;
     try { if (destino) destino.focus({ preventScroll: true }); } catch (err) {}
   }
@@ -791,7 +800,7 @@
     poner();
     if (QUIETO.matches) return;
     setInterval(function () {
-      if (document.visibilityState !== 'visible' || vista !== 'inicio' || campo.value) return;
+      if (document.visibilityState !== 'visible' || vista !== 'inicio' || campo.value || app.classList.contains('adorno-quieto')) return;
       poner();
     }, 3600);
   }
@@ -972,7 +981,7 @@
       });
       C.guardar(C.PRE + 'olvido', String(Date.now()));     // les avisa a las otras ventanas de la app
       soltarTodo();
-      notar('Listo. En este teléfono ya no queda ninguna conversación.');
+      notar('Listo. Acá ya no queda ninguna conversación.');
     });
     // La app puede estar abierta en dos ventanas (instalada y en una pestaña). Si en la otra se
     // borraron las conversaciones, o un chat empezó de nuevo, acá también se sueltan: si no, esta

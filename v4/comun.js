@@ -14,7 +14,10 @@ window.Comun = (function () {
   // mandan o qué significan, se sube el número: al publicar, por un rato puede quedar la app
   // vieja con un marco nuevo, y así la app se da cuenta y se recarga sola (ver app.js, «hola»).
   var VERSION = 4;
-  var PRE = 'grupo' + VERSION + '_';   // prefijo de todo lo que la app guarda en el navegador
+  // Prefijo de todo lo que la app guarda en el navegador. Es FIJO a propósito: si dependiera de
+  // VERSION, cada vez que se sube ese número la app olvidaría qué mensajes ya se vieron y avisaría
+  // «te contestaron» por conversaciones leídas.
+  var PRE = 'grupo_';
 
   function leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }

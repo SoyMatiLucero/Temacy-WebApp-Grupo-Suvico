@@ -162,7 +162,8 @@ ul { padding: 0; list-style: none; }
 @keyframes deriva-c { to { transform: translate3d(-12vmax, -5vmax, 0) scale(.86); } }
 /* Lo que no se ve no se mueve: con un chat a la vista, el inicio queda quieto. */
 .app:not([data-vista="inicio"]) .luces i,
-.app:not([data-vista="inicio"]) .cinta-pista { animation-play-state: paused; }
+.app.adorno-quieto .luces i,
+.app:not([data-vista="inicio"]) .cinta.corre .cinta-pista { animation-play-state: paused; }
 
 .cabecera {
   display: grid;
@@ -240,23 +241,25 @@ h1 {
 .consulta-borrar:active { transform: scale(.92); }
 /* Los ejemplos que van pasando por el campo vacío (los pone app.js). */
 .consulta-ejemplo {
-  position: absolute; left: 56px; right: 60px; top: 0;
+  position: absolute; left: 56px; right: 22px; top: 0;
   display: flex; align-items: center;
   height: 62px;
   overflow: hidden;
   color: var(--texto-3);
-  font-weight: 500;
-  white-space: nowrap;
+  font-size: .98rem; font-weight: 500; line-height: 1.22;
   pointer-events: none;
 }
-.consulta-ejemplo > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; animation: ejemplo .7s var(--ease) both; }
+.consulta:has(.consulta-borrar:not([hidden])) .consulta-ejemplo { right: 60px; }
+.consulta-ejemplo > span { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; animation: ejemplo .7s var(--ease) both; }
 .consulta.con-texto .consulta-ejemplo { display: none; }
 @keyframes ejemplo { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 /* Lo que aparece al escribir (y el inicio al volver de ahí) entra de una vez, sin escalonar:
    las filas se rehacen con cada letra. */
 .resultados, .portada { animation: entra .55s var(--ease) both; }
-.estreno .portada { animation: none; }
+/* Durante el estreno dura cero (no «none»): al sacar la clase, cambiar la duración de una animación
+   ya terminada no la arranca de nuevo; cambiarle el nombre, sí. */
+.estreno .portada { animation-duration: 0s; }
 
 .rotulo { margin: 36px 0 14px; font: 800 1.45rem/1.05 var(--display); letter-spacing: -.02em; text-wrap: balance; }
 .nota { margin-top: 22px; max-width: 62ch; color: var(--texto-3); font-size: .92rem; text-wrap: pretty; }
@@ -310,7 +313,9 @@ h1 {
   .fila:hover .fila-flecha { transform: translateX(5px); color: var(--turq-luz); }
 }
 .fila[aria-disabled="true"] { cursor: default; transform: none; box-shadow: inset 0 0 0 1px var(--linea); }
-.fila[aria-disabled="true"] > * { opacity: .5; }
+.fila[aria-disabled="true"] > .avatar, .fila[aria-disabled="true"] > .fila-meta { opacity: .5; }
+.fila[aria-disabled="true"] .fila-nombre { opacity: .6; }
+.fila[aria-disabled="true"] .fila-previa { color: var(--texto-3); }      /* el motivo se tiene que poder leer */
 .fila[aria-disabled="true"]::before { opacity: 0; }
 .fila-texto { display: grid; gap: 3px; min-width: 0; }
 .fila-nombre { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 800 1.2rem/1.15 var(--display); letter-spacing: -.01em; transition: color .25s; }
@@ -330,6 +335,7 @@ h1 {
   line-height: 1.4;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
 }
+.puertas .fila-previa { -webkit-line-clamp: 3; line-clamp: 3; }
 .fila.con-novedad { box-shadow: inset 0 0 0 1px var(--turq-luz); }
 .fila.con-novedad .fila-previa { color: var(--texto); font-weight: 700; }
 .fila-meta { display: grid; justify-items: end; gap: 6px; color: var(--texto-3); font-size: .8rem; white-space: nowrap; }
@@ -349,6 +355,7 @@ h1 {
 .lista > li + li { border-top: 1px solid var(--linea); }
 .lista .fila { min-height: 68px; padding: 14px 12px; overflow: visible; border-radius: var(--r); background: none; box-shadow: none; isolation: auto; }
 .lista .fila::before { content: none; }
+.lista .fila:focus-visible { outline-offset: -3px; }
 .lista .fila:active { background: rgba(127, 227, 241, .12); transform: none; }
 @media (hover: hover) {
   .lista .fila:hover { background: rgba(127, 227, 241, .08); }
@@ -394,7 +401,7 @@ h1 {
 @keyframes pulso { 0% { opacity: .9; transform: scale(1); } 80%, 100% { opacity: 0; transform: scale(2.6); } }
 
 /* ── La cinta de texto (adorno) ───────────────────────────────────────────────────────────── */
-.cinta-marco { position: relative; margin: 30px calc(var(--borde) * -1) 0; padding-bottom: 24px; }
+.cinta-marco { position: relative; margin: 30px calc(var(--borde) * -1) 0; padding-bottom: 56px; }
 .cinta {
   display: grid; gap: 4px;
   overflow: hidden;
@@ -518,7 +525,7 @@ h1 {
 .marco { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; visibility: hidden; background: var(--papel); }
 .marco.activo { visibility: visible; }
 /* Con el teclado abierto el chat ocupa todo lo que queda: ahí el lugar vale más que el marco. */
-.app.teclado .marcos { top: 0; right: 0; bottom: 0; left: 0; border-radius: 0; box-shadow: none; }
+.app.teclado .marcos { top: env(safe-area-inset-top); right: 0; bottom: 0; left: 0; width: auto; translate: none; border-radius: 0; box-shadow: none; }
 
 /* ── Pestañas: una píldora de vidrio que flota (abajo en el teléfono) ─────────────────────── */
 .pestanas {
@@ -657,6 +664,7 @@ html:not(.con-vt) .marco.activo { animation: entra .5s var(--ease) both; }
     width: min(calc(100% - 40px), 1120px);
     padding: 8px 8px 8px 24px;
   }
+  .aviso-red:not([hidden]) ~ .pestanas { top: 52px; }      /* debajo del aviso de «sin conexión», no encima */
   .pestanas-marca { display: inline-flex; align-items: center; gap: 12px; margin-right: auto; color: var(--turq); font: 800 1.14rem/1 var(--display); letter-spacing: -.01em; }
   .pestanas-marca span { color: var(--texto); }
   .pestana {
@@ -695,6 +703,7 @@ html:not(.con-vt) .marco.activo { animation: entra .5s var(--ease) both; }
   .tramo-puertas .nota { text-align: center; margin-inline: auto; }
 
   .cinta-marco { margin: clamp(34px, 6vh, 64px) calc(50% - 50vw) 0; }
+  .cinta-marco { padding-bottom: 24px; }
   .cinta { gap: 10px; padding-block: 22px; }
   .cinta-pausa { right: max(var(--borde), calc(50vw - 570px)); }
 
@@ -743,3 +752,6 @@ html:not(.con-vt) .marco.activo { animation: entra .5s var(--ease) both; }
   .espera { opacity: 1; transform: none; }
   .cabecera, .luces { transform: none; opacity: 1; }
 }
+
+/* Las tarjetas de las entidades miden todas lo mismo aunque una tenga un renglón más de texto. */
+#conversaciones > li { display: grid; }
