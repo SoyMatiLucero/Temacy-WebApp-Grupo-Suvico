@@ -1,6 +1,7 @@
 # Publica la web app en web.temacy.com/suvico-app en cada push a main.
 # 1) Si hay package.json, instala y hace el build con la subruta /suvico-app/.
 #    Si no, publica los archivos del repo tal cual (sitio estático).
+#    Si todavía no hay index.html, publica una página de "Próximamente".
 # 2) Agrega <meta name="robots" content="noindex"> a cada HTML y un .htaccess
 #    con noindex + rewrite para SPA (las rutas internas vuelven a index.html).
 # 3) Sube por FTP. La cuenta FTP tiene como raíz public_html/web/suvico-app,
@@ -9,7 +10,7 @@ name: Deploy a web.temacy.com/suvico-app
 
 on:
   push:
-    branches: [main, claude/project-thread-iiynbb]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -68,16 +69,6 @@ jobs:
             grep -qi 'name="robots"' "$f" || sed -i '0,/<head[^>]*>/I s//&\n    <meta name="robots" content="noindex, nofollow">/' "$f"
           done
           ls -la _publicar
-
-      - name: Diagnóstico de conexión FTP
-        if: steps.juntar.outputs.hay == 'si'
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-        run: |
-          echo "Largo del host cargado: ${#FTP_SERVER}"
-          echo "IP del host cargado:   $(getent hosts "$FTP_SERVER" | awk '{print $1}' | head -1)"
-          echo "IP de ftp.temacy.com:  $(getent hosts ftp.temacy.com | awk '{print $1}' | head -1)"
-          timeout 10 bash -c "</dev/tcp/$FTP_SERVER/21" && echo "Puerto 21 abierto" || echo "Puerto 21 NO responde"
 
       - name: Subir por FTP
         if: steps.juntar.outputs.hay == 'si'
