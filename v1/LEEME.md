@@ -30,8 +30,8 @@ No tiene backend propio ni compilación: son archivos estáticos que usan el cha
 Hace falta la API de la plataforma corriendo. Con Node 20:
 
 ```
-node web_grupo/servidor-local.js v1
-API=http://127.0.0.1:3110 node web_grupo/servidor-local.js v1    # otra API
+node servidor-local.js v1
+API=http://127.0.0.1:3110 node servidor-local.js v1    # otra API
 ```
 
 Abre en `http://127.0.0.1:4510`. El servidor local (`../servidor-local.js`) hace lo mismo que nginx va a hacer en el subdominio: sirve esta carpeta y le pasa a la API sólo las rutas del chat.

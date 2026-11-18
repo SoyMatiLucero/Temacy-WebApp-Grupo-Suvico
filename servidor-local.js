@@ -1,12 +1,12 @@
 /*
  * Servidor para PROBAR la web app del grupo en esta máquina. No se publica.
  *
- * Levanta cada versión (web_grupo/v1, web_grupo/v2, …) en su propio puerto —cada una con su
+ * Levanta cada versión (v1, v2, …) en su propio puerto —cada una con su
  * almacenamiento y su service worker, como si fueran dos sitios distintos— y una página para verlas
  * lado a lado:
  *
- *   node web_grupo/servidor-local.js        → v1 en :4510 · v2 en :4520 · lado a lado en :4505
- *   node web_grupo/servidor-local.js v2     → sólo esa versión
+ *   node servidor-local.js                  → v1 en :4510 · v2 en :4520 · lado a lado en :4505
+ *   node servidor-local.js v2               → sólo esa versión
  *   API=http://127.0.0.1:3110 node …        → otra API (por defecto http://127.0.0.1:3100)
  *   RED=1 node …                            → escucha también en la red local, para abrirla desde un
  *                                             teléfono (ahí no hay modo sin conexión ni micrófono:

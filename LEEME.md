@@ -2,6 +2,8 @@
 
 La puerta de entrada común a los chats de las tres entidades. El plan completo (fases, decisiones y pendientes) está en `docs/plan_webapp.md`.
 
+Este repo es sólo la app. El chat (`/widget.js`) y su API (`/api/web-chat/`) los sirve la plataforma, que vive en otro repo; cuando un documento de acá nombra `platform/…` o `deploy/…`, habla de ese repo. La app nació ahí como `web_grupo/` y pasó a este repo el 18-11-2026.
+
 Cada versión vive en su carpeta, para poder compararlas:
 
 | Carpeta | Qué es |
@@ -19,7 +21,7 @@ La v3, la v4 y la v5 son la misma app por dentro (la lógica de la v2) con piele
 Hace falta la API de la plataforma corriendo. Con Node 20:
 
 ```
-API=http://127.0.0.1:3110 node web_grupo/servidor-local.js
+API=http://127.0.0.1:3110 node servidor-local.js
 ```
 
 - v1: `http://127.0.0.1:4510`
@@ -108,8 +110,8 @@ Lo que hay que resolver en la plataforma, que no es de la app, está en `docs/pl
 `pruebas/recorrido.js` y `pruebas/recorrido-delicado.js` recorren la app como un usuario, en un navegador de verdad (Playwright), en teléfono y en escritorio, mandando mensajes reales a los bots de la base local. Sirven para la v2, la v3 y la v4: se les pasa la dirección y detectan la versión solas.
 
 ```
-PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node web_grupo/pruebas/recorrido.js
-PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node web_grupo/pruebas/recorrido-delicado.js
+PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node pruebas/recorrido.js
+PLAYWRIGHT=<carpeta de playwright> URL=http://127.0.0.1:4530/ node pruebas/recorrido-delicado.js
 ```
 
 Sin `URL` prueban la v2. Con `rapido` al final, el primero no manda mensajes. Cada corrida deja conversaciones de prueba en la base local.

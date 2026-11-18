@@ -6,7 +6,7 @@
  * Es una prueba COMO USUARIO: abre la app en un navegador de verdad, toca, escribe y mira qué pasa.
  * Necesita la API de la plataforma y el servidor local corriendo (ver ../LEEME.md) y Playwright:
  *
- *   PLAYWRIGHT=<carpeta de playwright> node web_grupo/pruebas/<este archivo>
+ *   PLAYWRIGHT=<carpeta de playwright> node pruebas/<este archivo>
  *
  * Variables: URL (por defecto http://127.0.0.1:4520/), SALIDA (carpeta para las capturas; por
  * defecto, una en la carpeta temporal del sistema). Manda mensajes reales a los bots de la base
