@@ -1,22 +1,14 @@
-# web.temacy.com/suvico-app: fuera de Google y rutas de SPA.
+# web.temacy.com/suvico-app: fuera de Google.
 <IfModule mod_headers.c>
   Header always set X-Robots-Tag "noindex, nofollow, noarchive"
 </IfModule>
 
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /suvico-app/
-  # Si el archivo o carpeta existe, se sirve tal cual.
-  RewriteCond %{REQUEST_FILENAME} -f [OR]
-  RewriteCond %{REQUEST_FILENAME} -d
-  RewriteRule ^ - [L]
-  # Cualquier otra ruta de la app vuelve a index.html.
-  RewriteRule ^ index.html [L]
-</IfModule>
-
-# Que index.html no quede en caché vieja después de cada deploy.
-<FilesMatch "index\.html$">
+# Que la página y el service worker no queden en caché vieja después de cada deploy
+# (la app ya guarda su propia copia para abrir sin conexión).
+<FilesMatch "(\.html|sw\.js|\.webmanifest)$">
   <IfModule mod_headers.c>
     Header set Cache-Control "no-cache"
   </IfModule>
 </FilesMatch>
+
+AddType application/manifest+json .webmanifest
