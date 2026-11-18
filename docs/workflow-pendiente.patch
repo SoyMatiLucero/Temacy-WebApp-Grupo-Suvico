@@ -1,0 +1,57 @@
+diff --git a/.github/workflows/deploy-ftp.yml b/.github/workflows/deploy-ftp.yml
+index fa60654..4df9ff3 100644
+--- a/.github/workflows/deploy-ftp.yml
++++ b/.github/workflows/deploy-ftp.yml
+@@ -1,9 +1,10 @@
+ # Publica la web app en web.temacy.com/suvico-app en cada push a main.
+ # 1) Si hay package.json, instala y hace el build con la subruta /suvico-app/.
+-#    Si no, publica los archivos del repo tal cual (sitio estático).
++#    Si no, publica los archivos de la app tal cual (sitio estático): sólo la app, no el
++#    repo entero (ver el paso «Juntar los archivos a publicar»).
+ #    Si todavía no hay index.html, publica una página de "Próximamente".
+ # 2) Agrega <meta name="robots" content="noindex"> a cada HTML y un .htaccess
+-#    con noindex y sin caché para index/sw.js. Revisa que estén los archivos de sw.js.
++#    con noindex y sin caché para los archivos de la app. Revisa que estén los archivos de sw.js.
+ # 3) Sube por FTP. La cuenta FTP tiene como raíz public_html/web/suvico-app,
+ #    por eso server-dir es ./ (no puede tocar otras carpetas del sitio).
+ name: Deploy a web.temacy.com/suvico-app
+@@ -56,11 +57,17 @@ jobs:
+               if [ -f "$d/index.html" ]; then cp -a "$d/." _publicar/; break; fi
+             done
+           else
+-            # Solo la app: docs/, referencia/, pruebas/, servidor-local.js y los .md
+-            # son herramientas de trabajo (ver LEEME.md).
+-            rsync -a --exclude '.git*' --exclude '.github' --exclude '_publicar' \
+-              --exclude 'docs' --exclude 'referencia' --exclude 'pruebas' \
+-              --exclude 'servidor-local.js' --exclude '*.md' ./ _publicar/
++            # Sitio estático: se publica SÓLO la app, no el repo entero. La app son los .html, .js y
++            # .css de la raíz, el manifiesto y las carpetas icons/ y fuentes/ (la lista ARCHIVOS de
++            # sw.js, más el propio sw.js). Todo lo demás queda afuera sin tener que nombrarlo: docs/,
++            # referencia/, pruebas/, herramientas/, .claude/, los .md y servidor-local.js.
++            rsync -a \
++              --exclude='/servidor-local.js' \
++              --include='/*.html' --include='/*.js' --include='/*.css' \
++              --include='/manifest.webmanifest' \
++              --include='/icons/***' --include='/fuentes/***' \
++              --exclude='*' \
++              ./ _publicar/
+           fi
+           if [ ! -f _publicar/index.html ]; then
+             echo "::warning::Todavía no hay app; se publica una página de 'Próximamente'."
+@@ -75,6 +82,16 @@ jobs:
+             done
+             [ "$faltan" = 0 ] || exit 1
+           fi
++          # El sello de esta publicación: el identificador del commit. sw.js y las páginas piden
++          # los archivos con ese sello en la dirección, así el teléfono se entera de que hay una
++          # publicación nueva y ningún intermediario le devuelve los archivos de la anterior.
++          sello="${GITHUB_SHA::8}"
++          for f in _publicar/sw.js _publicar/index.html _publicar/charla.html; do
++            if [ -f "$f" ]; then sed -i "s/__SELLO__/$sello/g" "$f"; fi
++          done
++          if grep -rq '__SELLO__' _publicar --include='*.html' --include='*.js'; then
++            echo "::error::Quedó un __SELLO__ sin reemplazar"; exit 1
++          fi
+           echo "hay=si" >> "$GITHUB_OUTPUT"
+           cp .github/deploy/htaccess _publicar/.htaccess
+           # meta noindex en cada HTML que no la tenga

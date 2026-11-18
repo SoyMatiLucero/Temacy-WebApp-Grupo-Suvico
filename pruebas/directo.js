@@ -66,7 +66,7 @@ const marco = (p, slug) => p.frameLocator(`iframe.marco[src*="e=${slug}"]`);
     if (u.startsWith(APP) && /\/(api|socket\.io|uploads|brands)\/|\/widget\.js/.test(u)) pedidos.alSitio.push(u.slice(0, 90));
   });
   await c.route(PRODUCCION + '/**', (ruta) => ruta.abort());      // nada sale a producción
-  await c.route('**/entidades.js', async (ruta) => {
+  await c.route(/\/entidades\.js(\?|$)/, async (ruta) => {      // se pide con el sello de la publicación (?v=…)
     const r = await ruta.fetch({ url: LOCAL + '/entidades.js' });   // lo pide Node, que no conoce `app.prueba`
     const cuerpo = (await r.text()).split(PRODUCCION + '/widget.js').join(API + '/widget.js');
     await ruta.fulfill({ response: r, body: cuerpo });

@@ -10,7 +10,8 @@ Respondé en español rioplatense. Los documentos, los comentarios y los nombres
 
 - **No pushees sin que te lo pidan.** Commitear en local sí, apenas algo esté listo.
 - Antes de pushear, probá en local (ver «Probar») y decí qué se va a publicar.
-- El workflow publica SÓLO la app: los `.html`, `.js` y `.css` de la raíz, `manifest.webmanifest`, `icons/` y `fuentes/`. Un archivo de la app en otro lugar no se publica si no se suma ahí.
+- El workflow publica el repo menos `docs/`, `referencia/`, `pruebas/`, `servidor-local.js` y los `.md`: **lo que no esté en esa lista llega al sitio**. Pasarlo a una lista de lo que sí va está pendiente (`docs/workflow-pendiente.patch`; ver LEEME, «Publicarla»).
+- Los archivos bajo `.github/workflows/` no se pueden pushear con el token de la PC de desarrollo (no tiene permiso `workflow`): un commit que los toque hace rechazar el push entero. Dejalos en un commit aparte y avisá.
 - El repo es público: no escribas en él claves, datos de personas ni detalles de fallas de seguridad sin arreglar.
 
 ## Dónde está cada cosa
@@ -58,7 +59,11 @@ PLAYWRIGHT=<carpeta de playwright> node pruebas/recorrido.js rapido      # sin m
 PLAYWRIGHT=<carpeta de playwright> node pruebas/recorrido.js             # manda mensajes reales a los bots locales
 PLAYWRIGHT=<carpeta de playwright> node pruebas/recorrido-delicado.js    # trámites, teclado, consulta de fondo
 PLAYWRIGHT=<carpeta de playwright> node pruebas/directo.js               # como publicada: el script de cada entidad
+PLAYWRIGHT=<carpeta de playwright> node pruebas/dispositivos.js          # once tamaños de pantalla + iPhone anclado (simulado)
 ```
+
+- `__SELLO__` en `sw.js`, `index.html` y `charla.html` no es un error: es el sello de la publicación, que el deploy va a reemplazar por el identificador del commit (pendiente, ver LEEME). No lo saques ni lo cambies a mano.
+- Un cambio publicado se ve la SEGUNDA vez que se abre la app en el teléfono (la primera abre de la copia guardada).
 
 - Un cambio con interfaz no está terminado con las pruebas en verde: abrí la pantalla, sacá capturas en teléfono y en escritorio y miralas.
 - Corré una prueba por vez y no mientras corre otra cosa pesada.
