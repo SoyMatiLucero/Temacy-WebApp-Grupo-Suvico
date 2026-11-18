@@ -14,6 +14,7 @@ Este repo es sólo la app. El chat (`/widget.js`) y su API (`/api/web-chat/`) lo
 | `sw.js`, `manifest.webmanifest`, `icons/`, `fuentes/` | Lo que la hace instalable y que abra sin conexión; las tipografías. |
 | `docs/la_app.md` | Qué es esta versión y qué le falta. |
 | `docs/plan_webapp.md` | El plan. |
+| `backlog.md` | Lo que falta, por sprints, con el punto de partida medido (rendimiento). |
 | `referencia/` | Las cuatro versiones anteriores (`v1` a `v4`), guardadas para consultarlas. No se mantienen. Qué es cada una y en qué se diferencian: `referencia/LEEME.md`. |
 | `pruebas/` | Recorridos de la app como usuario, en un navegador de verdad. |
 | `herramientas/` | La imagen que se ve al compartir el enlace (`compartir.html`) y el guion que la genera en `icons/compartir.png`. |
@@ -71,6 +72,12 @@ PLAYWRIGHT=<carpeta de playwright> node pruebas/dispositivos.js
 
 ```
 PLAYWRIGHT=<carpeta de playwright> node pruebas/directo.js
+```
+
+`pruebas/rendimiento.js` mide cuánto tarda y cuánto pesa: la primera visita y la segunda, con una 4G lenta y el procesador frenado; cuánto trabaja en reposo; y, sólo contra esta máquina, entrar a cada chat. Contra la app publicada (`URL=https://…`) no entra a los chats. Sus números son el punto de partida de `backlog.md`.
+
+```
+PLAYWRIGHT=<carpeta de playwright> node pruebas/rendimiento.js
 ```
 
 ## Publicarla
