@@ -17,6 +17,12 @@
  * Al sumar un archivo a la app hay que sumarlo a ARCHIVOS, o no va a estar sin conexión.
  */
 const COPIA = 'grupo-v5';
+// El sello de esta publicación. El deploy lo reemplaza por el identificador del commit (ver
+// .github/workflows/deploy-ftp.yml); en una máquina de desarrollo queda tal cual. Sirve para dos
+// cosas: este archivo cambia en cada publicación, así que el teléfono se entera de que hay una
+// nueva; y los archivos se piden con el sello en la dirección, así ningún intermediario (la CDN
+// del hosting guardaba los .js y .css una semana) puede devolver los de la publicación anterior.
+const SELLO = '__SELLO__';
 const BASE = new URL(self.registration.scope).pathname;
 const ARCHIVOS = ['', 'index.html', 'app.css', 'app.js', 'movimiento.js', 'comun.js', 'entidades.js',
   'charla.html', 'charla.css', 'charla.js', 'manifest.webmanifest',
@@ -31,7 +37,8 @@ function ponerAlDia() {
   if (enCurso) return enCurso;
   enCurso = (async () => {
     const rutas = [...RUTAS];
-    const respuestas = await Promise.all(rutas.map((r) => fetch(r, { cache: 'no-cache' })));
+    // Se piden con el sello y se guardan por su ruta pelada, que es como después se los busca.
+    const respuestas = await Promise.all(rutas.map((r) => fetch(r + '?v=' + SELLO, { cache: 'no-cache' })));
     if (respuestas.some((r) => !r.ok)) return;            // faltó alguno: se deja la copia como estaba
     const copia = await caches.open(COPIA);
     await Promise.all(rutas.map((r, i) => copia.put(r, respuestas[i])));
