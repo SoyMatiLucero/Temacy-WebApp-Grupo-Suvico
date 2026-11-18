@@ -1,0 +1,81 @@
+# Publica la web app en web.temacy.com/suvico-app en cada push a main.
+# 1) Si hay package.json, instala y hace el build con la subruta /suvico-app/.
+#    Si no, publica los archivos del repo tal cual (sitio estático).
+# 2) Agrega <meta name="robots" content="noindex"> a cada HTML y un .htaccess
+#    con noindex + rewrite para SPA (las rutas internas vuelven a index.html).
+# 3) Sube por FTP. La cuenta FTP tiene como raíz public_html/web/suvico-app,
+#    por eso server-dir es ./ (no puede tocar otras carpetas del sitio).
+name: Deploy a web.temacy.com/suvico-app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ftp
+  cancel-in-progress: false
+
+env:
+  BASE_PATH: /suvico-app/
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el repo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build
+        if: hashFiles('package.json') != ''
+        env:
+          PUBLIC_URL: /suvico-app          # Create React App
+          VITE_BASE_PATH: /suvico-app/     # por si el vite.config lo lee
+          NEXT_PUBLIC_BASE_PATH: /suvico-app
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if ls vite.config.* >/dev/null 2>&1; then
+            npx vite build --base="$BASE_PATH"
+          else
+            npm run build
+          fi
+
+      - name: Juntar los archivos a publicar
+        id: juntar
+        run: |
+          mkdir -p _publicar
+          if [ -f package.json ]; then
+            for d in dist build out; do
+              if [ -f "$d/index.html" ]; then cp -a "$d/." _publicar/; break; fi
+            done
+          else
+            rsync -a --exclude '.git*' --exclude '.github' --exclude '_publicar' --exclude 'README.md' ./ _publicar/
+          fi
+          if [ ! -f _publicar/index.html ]; then
+            echo "::warning::Todavía no hay index.html para publicar; no se sube nada."
+            echo "hay=no" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "hay=si" >> "$GITHUB_OUTPUT"
+          cp .github/deploy/htaccess _publicar/.htaccess
+          # meta noindex en cada HTML que no la tenga
+          find _publicar -name '*.html' -print0 | while IFS= read -r -d '' f; do
+            grep -qi 'name="robots"' "$f" || sed -i '0,/<head[^>]*>/I s//&\n    <meta name="robots" content="noindex, nofollow">/' "$f"
+          done
+          ls -la _publicar
+
+      - name: Subir por FTP
+        if: steps.juntar.outputs.hay == 'si'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./_publicar/
+          server-dir: ./
+          dangerous-clean-slate: false
