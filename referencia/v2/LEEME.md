@@ -75,7 +75,7 @@ La app no puede avisar con la app cerrada (haría falta backend), y lo dice.
 - **La obra social es `reservada`** (en `entidades.js`): lo que se habla con ella puede ser de salud. Fuera del chat, la app no muestra el texto de sus mensajes (sólo «Te contestaron» y la hora) ni deja escrita en el inicio la consulta que se le mandó.
 - **En el teléfono queda guardado:** la configuración pública del chat de cada entidad, la huella y la hora de lo último visto, y lo que el propio chat guarda (la credencial de cada conversación). Ningún texto de mensajes.
 - **«Borrar mis conversaciones de este teléfono»** saca las credenciales y cierra los chats, también en otra ventana de la app que esté abierta. No borra nada en la entidad, y lo dice.
-- **El dominio de la app no sirve nada subido por nadie** (logos, archivos del bot, aviso de privacidad): se redirige al dominio de la plataforma. Ahí están guardadas las credenciales de las tres conversaciones; un archivo subido que se abriera en este dominio podría leerlas. Ver `../nginx-subdominio.ejemplo.conf`, advertencia 4.
+- **El dominio de la app no sirve nada subido por nadie** (logos, archivos del bot, aviso de privacidad): se redirige al dominio de la plataforma. Ahí están guardadas las credenciales de las tres conversaciones; un archivo subido que se abriera en este dominio podría leerlas. Ver `../../LEEME.md`, «Antes de publicarla».
 
 ## El buscador del inicio
 
@@ -110,4 +110,4 @@ Dos cosas a saber:
 - **Archivos nuevos:** sumarlos a `ARCHIVOS` en `sw.js`, o no van a estar sin conexión. Y al publicar, comprobar que estén todos: si falta uno, la copia guardada de los teléfonos no se actualiza.
 - **Un cambio publicado se ve la segunda vez que se abre la app**, no la primera: abre de la copia guardada y se pone al día por detrás.
 - **El ícono:** se edita `icons/icon.svg` y se vuelven a generar los tres PNG.
-- **Probar:** `../pruebas/recorrido.js` y `../pruebas/recorrido-delicado.js` (ver `../LEEME.md`).
+- **Probar:** `../../pruebas/recorrido.js` y `../../pruebas/recorrido-delicado.js` (ver `../../LEEME.md`).

@@ -1,20 +1,21 @@
 /*
- * Servidor para PROBAR la web app del grupo en esta máquina. No se publica.
+ * Servidor para PROBAR la web app del grupo en esta máquina. No es parte de la app.
  *
- * Levanta cada versión (v1, v2, …) en su propio puerto —cada una con su
- * almacenamiento y su service worker, como si fueran dos sitios distintos— y una página para verlas
- * lado a lado:
+ * La app es la v5 (carpeta v5/). Las versiones anteriores están en referencia/ (v1 a v4). Cada una
+ * se levanta en su propio puerto —con su almacenamiento y su service worker, como si fueran sitios
+ * distintos— y hay una página para verlas lado a lado:
  *
- *   node servidor-local.js                  → v1 en :4510 · v2 en :4520 · lado a lado en :4505
- *   node servidor-local.js v2               → sólo esa versión
+ *   node servidor-local.js                  → la app (v5) en :4550
+ *   node servidor-local.js referencia       → además v1 en :4510 … v4 en :4540 · lado a lado en :4505
+ *   node servidor-local.js v3 v5            → sólo esas versiones
  *   API=http://127.0.0.1:3110 node …        → otra API (por defecto http://127.0.0.1:3100)
  *   RED=1 node …                            → escucha también en la red local, para abrirla desde un
  *                                             teléfono (ahí no hay modo sin conexión ni micrófono:
  *                                             el navegador los reserva para https)
  *
- * Cada puerto hace lo mismo que nginx va a hacer en el subdominio: sirve la carpeta de esa versión en
- * la raíz y le pasa a la API de la plataforma las rutas del chat, conservando el `Host` del pedido
- * (así la API ve que la página y ella están en el mismo dominio, igual que en producción).
+ * Cada puerto hace lo que tiene que hacer el servidor que la publique: sirve la carpeta de esa
+ * versión en la raíz y le pasa a la API de la plataforma las rutas del chat, conservando el `Host`
+ * del pedido (así la API ve que la página y ella están en el mismo dominio, igual que en producción).
  *
  * Lo que NO hace, a propósito: servir en este dominio nada que haya subido alguien. Los logos, los
  * archivos que manda el bot y el aviso de privacidad se piden acá pero se contestan con una
@@ -31,12 +32,15 @@ const path = require('path');
 const API = new URL(process.env.API || 'http://127.0.0.1:3100');
 const ESCUCHA = process.env.RED === '1' ? '0.0.0.0' : '127.0.0.1';
 const BASE = __dirname;
+const REFERENCIA = path.join(BASE, 'referencia');
+const LA_APP = 'v5';              // la versión elegida (18-11-2026): está en la raíz; las demás, en referencia/
 const PUERTO_COMPARADOR = 4505;
 const puertoDe = (version) => 4500 + 10 * Number(version.slice(1));   // v1 → 4510, v2 → 4520…
+const carpetaDe = (version) => path.join(version === LA_APP ? BASE : REFERENCIA, version);
 
-// SÓLO lo que el chat necesita, que es lo mismo que tiene que hacer nginx en el subdominio (ver
-// nginx-subdominio.ejemplo.conf). El resto de la API de la plataforma no se expone en este dominio:
-// si el chat empieza a pedir una ruta nueva, acá da 404 y se ve en la prueba, que es la idea.
+// SÓLO lo que el chat necesita, que es lo mismo que tiene que hacer el servidor que la publique
+// (ver LEEME.md). El resto de la API de la plataforma no se expone en este dominio: si el chat
+// empieza a pedir una ruta nueva, acá da 404 y se ve en la prueba, que es la idea.
 const A_LA_API = [
   /^\/api\/web-chat\//,   // el chat: configuración, mensajes, adjuntos, trámites
   /^\/socket\.io\//,      // los mensajes en vivo
@@ -106,7 +110,7 @@ function escuchar(servidor, puerto, nombre) {
 }
 
 function levantarVersion(version) {
-  const raiz = path.join(BASE, version);
+  const raiz = carpetaDe(version);
   const servidor = http.createServer((req, res) => {
     const ruta = rutaDe(req.url);
     if (ruta && vaALaApi(ruta)) return aLaApi(req, res);
@@ -140,14 +144,19 @@ function levantarComparador(versiones) {
       return res.end('window.VERSIONES = ' + JSON.stringify(versiones.map((v) => ({ nombre: v, puerto: puertoDe(v) }))) + ';');
     }
     if (ruta !== '/') { res.writeHead(404); return res.end(); }
-    servirArchivo(path.join(BASE, 'comparar.html'), res);
+    servirArchivo(path.join(REFERENCIA, 'comparar.html'), res);
   });
   escuchar(comparador, PUERTO_COMPARADOR, 'lado a lado');
 }
 
-const todas = fs.readdirSync(BASE).filter((d) => /^v\d+$/.test(d) && fs.existsSync(path.join(BASE, d, 'index.html'))).sort();
+const hay = (v) => fs.existsSync(path.join(carpetaDe(v), 'index.html'));
+const deReferencia = fs.existsSync(REFERENCIA) ? fs.readdirSync(REFERENCIA).filter((d) => /^v\d+$/.test(d) && d !== LA_APP && hay(d)) : [];
+const todas = deReferencia.concat(hay(LA_APP) ? [LA_APP] : []).sort();
+// Sin argumentos, sólo la app. Con `referencia`, todas. Con nombres de versión, esas.
 const pedidas = process.argv.slice(2);
-const versiones = pedidas.length ? todas.filter((v) => pedidas.includes(v)) : todas;
+const versiones = !pedidas.length ? todas.filter((v) => v === LA_APP)
+  : pedidas.includes('referencia') ? todas
+  : todas.filter((v) => pedidas.includes(v));
 if (!versiones.length) { console.error('No hay ninguna versión para levantar. Están: ' + (todas.join(', ') || 'ninguna')); process.exit(1); }
 
 console.log(`Web app del grupo  (API: ${API.origin})`);

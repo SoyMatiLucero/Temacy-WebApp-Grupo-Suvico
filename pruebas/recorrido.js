@@ -1,6 +1,6 @@
 /*
- * Recorrido completo (v2, v3 y v4): inicio, buscador, temas, chats, avisos de respuesta, sin conexión, borrar conversaciones, escritorio.
- * La versión se detecta sola por la URL que se le pasa (v2 :4520, v3 :4530, v4 :4540).
+ * Recorrido completo de la app (la v5): inicio, buscador, temas, chats, avisos de respuesta, sin conexión, borrar conversaciones, escritorio.
+ * Sirve también para las de referencia: se le pasa su URL (v2 :4520, v3 :4530, v4 :4540) y detecta la versión sola.
  * Con el argumento `rapido` no manda mensajes (no gasta IA).
  *
  * Es una prueba COMO USUARIO: abre la app en un navegador de verdad, toca, escribe y mira qué pasa.
@@ -8,7 +8,7 @@
  *
  *   PLAYWRIGHT=<carpeta de playwright> node pruebas/<este archivo>
  *
- * Variables: URL (por defecto http://127.0.0.1:4520/), SALIDA (carpeta para las capturas; por
+ * Variables: URL (por defecto http://127.0.0.1:4550/, la app), SALIDA (carpeta para las capturas; por
  * defecto, una en la carpeta temporal del sistema). Manda mensajes reales a los bots de la base
  * local: cada corrida deja conversaciones de prueba en esa base.
  */
@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
 
-const URL0 = process.env.URL || 'http://127.0.0.1:4520/';
+const URL0 = process.env.URL || 'http://127.0.0.1:4550/';
 const OUT = process.env.SALIDA || path.join(require('os').tmpdir(), 'webapp-grupo-capturas');
 fs.mkdirSync(OUT, { recursive: true });
 const RAPIDO = process.argv.includes('rapido');      // sin mandar mensajes (no gasta IA)

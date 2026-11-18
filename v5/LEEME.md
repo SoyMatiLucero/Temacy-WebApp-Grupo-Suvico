@@ -1,10 +1,12 @@
 # Web app del grupo — versión 5, «neutra»
 
+**Es la versión elegida (18-11-2026): la app es esta carpeta.** Las otras cuatro quedaron en `../referencia/`, para consultarlas.
+
 La versión 3 sin el color de ninguna entidad. Nació el 18-11-2026: la v3 gustó, pero su inicio se veía como el sitio de Mavic (fondo azul de noche y turquesa), y una app de tres entidades no puede parecer de una. Se pidió conservar el contenido y lo moderno, y sacarle esa identidad.
 
 ## Qué cambia respecto de la v3
 
-Sólo la piel. El contenido, la disposición, las animaciones y el comportamiento son los de la v3: `app.js`, `movimiento.js`, `charla.js`, `entidades.js` y `charla.html` son idénticos byte a byte, así que un arreglo de lógica va igual en las tres (v3, v4 y v5).
+Sólo la piel. El contenido, la disposición, las animaciones y el comportamiento son los de la v3: `app.js`, `movimiento.js`, `charla.js`, `entidades.js` y `charla.html` son idénticos byte a byte a los de `../referencia/v3/`. Las versiones de referencia ya no se mantienen: un arreglo va sólo acá.
 
 | | v3 | v5 |
 |---|---|---|
@@ -20,13 +22,13 @@ Archivos que difieren de la v3: `app.css`, `charla.css`, `index.html` (el color 
 
 ## Lo que sigue valiendo de la v3
 
-Todo lo demás: el movimiento y sus reglas, las tipografías (Cabinet Grotesk y Satoshi, en `fuentes/`; la licencia hay que confirmarla antes de publicar), lo que no se probó. Está en `../v3/LEEME.md`. Cómo funciona por dentro, en `../v2/LEEME.md`.
+Todo lo demás: el movimiento y sus reglas, las tipografías (Cabinet Grotesk y Satoshi, en `fuentes/`; la licencia hay que confirmarla antes de publicar), lo que no se probó. Está en `../referencia/v3/LEEME.md`. Cómo funciona por dentro, en `../referencia/v2/LEEME.md`.
 
 ## Probada
 
 - `pruebas/recorrido-delicado.js` contra la v5: todo en verde (18-11-2026).
 - Capturas en teléfono y escritorio: inicio, búsqueda, entrar a un chat, pasar de un chat a otro y volver; sin errores de consola ni pedidos rechazados.
-- No se probó en teléfonos reales, igual que las demás.
+- No se probó en teléfonos reales.
 
 ## Pendiente
 

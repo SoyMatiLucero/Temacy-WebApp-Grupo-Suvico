@@ -1,19 +1,19 @@
 /*
- * Lo delicado de la v2: un trámite a medio completar, el teclado del teléfono (simulado), la consulta periódica de fondo y ponerse al día al volver.
+ * Lo delicado de la app (viene de la v2): un trámite a medio completar, el teclado del teléfono (simulado), la consulta periódica de fondo y ponerse al día al volver.
  *
  * Es una prueba COMO USUARIO: abre la app en un navegador de verdad, toca, escribe y mira qué pasa.
  * Necesita la API de la plataforma y el servidor local corriendo (ver ../LEEME.md) y Playwright:
  *
  *   PLAYWRIGHT=<carpeta de playwright> node pruebas/<este archivo>
  *
- * Variables: URL (por defecto http://127.0.0.1:4520/), SALIDA (carpeta para las capturas; por
+ * Variables: URL (por defecto http://127.0.0.1:4550/, la app), SALIDA (carpeta para las capturas; por
  * defecto, una en la carpeta temporal del sistema). Manda mensajes reales a los bots de la base
  * local: cada corrida deja conversaciones de prueba en esa base.
  */
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright');
-const URL0 = process.env.URL || 'http://127.0.0.1:4520/';
+const URL0 = process.env.URL || 'http://127.0.0.1:4550/';
 const OUT = process.env.SALIDA || path.join(require('os').tmpdir(), 'webapp-grupo-capturas'); fs.mkdirSync(OUT, { recursive: true });
 const fallas = [];
 const ok = (cond, msj) => { console.log((cond ? '  ✔ ' : '  ✖ ') + msj); if (!cond) fallas.push(msj); };

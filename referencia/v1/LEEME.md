@@ -1,6 +1,6 @@
 # Web app del grupo — versión 1
 
-> Esta es la **v1**, tal como se entregó el 17-11-2026. Queda congelada para comparar. La versión vigente y las diferencias están en `../LEEME.md`.
+> Esta es la **v1**, tal como se entregó el 17-11-2026. Queda congelada, como referencia. La versión elegida es la v5 (`../../v5/`); las diferencias entre versiones están en `../LEEME.md`.
 
 La puerta de entrada común a los chats de las tres entidades. El afiliado elige con quién hablar y se abre el chat de esa entidad. El plan completo (fases, decisiones y pendientes) está en `docs/plan_webapp.md`; esto es el paso 1.1.
 
@@ -34,7 +34,7 @@ node servidor-local.js v1
 API=http://127.0.0.1:3110 node servidor-local.js v1    # otra API
 ```
 
-Abre en `http://127.0.0.1:4510`. El servidor local (`../servidor-local.js`) hace lo mismo que nginx va a hacer en el subdominio: sirve esta carpeta y le pasa a la API sólo las rutas del chat.
+Abre en `http://127.0.0.1:4510`. El servidor local (`../../servidor-local.js`, que se corre desde la raíz del repo) hace lo mismo que tiene que hacer el servidor que la publique: sirve esta carpeta y le pasa a la API sólo las rutas del chat.
 
 La base local necesita el chat web de las tres entidades. Las claves de `entidades.js` son las de producción: si en la base local una entidad no tiene esa clave en `web_tenants`, su tarjeta sale como «No disponible por ahora».
 

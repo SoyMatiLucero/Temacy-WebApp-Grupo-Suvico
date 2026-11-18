@@ -22,15 +22,15 @@ Se entrega en tres pasos. Cada uno sirve por sí solo.
 
 ### Paso 1.1 — la app, sin login
 
-Construido el 17-11 en cuatro versiones, que están en carpetas separadas para compararlas (`v1` a `v4`). La comparación punto por punto está en `LEEME.md`.
+Se construyó en cinco versiones (17 y 18-11). **Elegida el 18-11: la v5**, que está en `v5/`. Las otras cuatro quedan en `referencia/` (`v1` a `v4`) para consultarlas; la comparación punto por punto está en `referencia/LEEME.md`.
 
 - **v1:** la pantalla «¿Con quién querés hablar?» con tres tarjetas; al elegir una se abre el chat de esa entidad. Usa el chat de la plataforma tal cual.
 - **v2:** una sola app con los tres chats vivos adentro. El inicio pregunta «¿Qué necesitás?» y deja buscar por tema o escribir la consulta y elegir a quién mandarla; pasar de una entidad a otra es un toque; avisa cuando contestan en una conversación que no se está mirando.
 
 - **v3 y v4:** la v2 funciona, pero no gustó cómo se ve (sobria y sin movimiento). Son la misma app por dentro con dos pieles nuevas y con animación: la **v3** toma el estilo del sitio de Mavic (de noche, turquesa) y la **v4** el de FitApp (verde bosque, lima y hueso). En las dos se ve una cosa por vez también en la computadora.
-- **v5 (18-11):** la v3 gustó, pero su inicio se veía como el sitio de Mavic y la app es de las tres entidades. La **v5** es la v3 con el mismo contenido y el mismo movimiento en una piel neutra: base grafito, luz blanca, y color sólo en lo que es de cada entidad (su tarjeta, su etiqueta, su logo, su chat). Está en `v5`.
+- **v5 (18-11):** la v3 gustó, pero su inicio se veía como el sitio de Mavic y la app es de las tres entidades. La **v5** es la v3 con el mismo contenido y el mismo movimiento en una piel neutra: base grafito, luz blanca, y color sólo en lo que es de cada entidad (su tarjeta, su etiqueta, su logo, su chat). **Es la elegida** y está en `v5/`.
 
-Estado: las cuatro andan en local. Ninguna está publicada. Falta elegir cuál se publica (sección 8) y, salvo la v1, probarla en teléfonos reales.
+Estado: elegida la v5 (18-11). Anda en local y no está publicada. Falta probarla en teléfonos reales.
 
 ### Paso 1.2 — Identidad única
 
@@ -92,7 +92,7 @@ Por ejemplo, que Mavic vea un reclamo hecho en Ospevic. **No se toca todavía.**
 | Identidad verificada dentro del chat | No existe | — |
 | Guía pública entre entidades | No existe | — |
 | Pase con resumen | No existe (la v2 tiene el adelanto manual) | — |
-| La web app (paso 1.1) | Cinco versiones construidas, sin publicar | `v1` a `v5` |
+| La web app (paso 1.1) | Elegida la v5 (18-11), sin publicar | `v5/`; las otras cuatro, en `referencia/` |
 | App «Mi protección SUVICO» | Existe en App Store y Google Play y es otro producto (seguridad: mapa de hechos delictivos, alertas, herramientas para vigiladores). La publica un tercero, no es de la plataforma. Detalle abajo | Fichas públicas de las tiendas |
 
 ### La app que Suvico ya tiene en las tiendas
@@ -107,7 +107,7 @@ Relevada el 17-11-2026 leyendo las fichas públicas de App Store y Google Play, 
 
 ## 7. Paso 1.1 — cómo se hizo y cómo se probó
 
-Cómo está hecha cada versión: `v1/LEEME.md` y `v2/LEEME.md`.
+Cómo está hecha cada versión: `referencia/v1/LEEME.md` y `referencia/v2/LEEME.md`; la elegida, en `v5/LEEME.md`.
 
 **Cómo se llegó a la v2.** Después de entregar la v1 se la revisó a fondo, de tres maneras: un estudio del chat de la plataforma tal como corre en producción (para saber hasta dónde se lo puede integrar sin modificarlo), una revisión de experiencia de uso con las capturas del recorrido, y una revisión de código. El veredicto de la revisión de experiencia sobre la v1: prolija como base técnica, pero «un directorio de tres links»: le pide al afiliado justo lo que no sabe (a cuál de las tres le toca su problema), cambiar de entidad recarga la página, y si le contestan más tarde no se entera.
 
@@ -132,7 +132,7 @@ Las pruebas quedaron en `pruebas/` para repetirlas.
 
 **Revisión adversarial de las dos versiones.** Antes de darla por buena, la v2 pasó por una revisión hecha para encontrarle defectos (código, seguridad y privacidad), con un verificador que intentó refutar cada hallazgo leyendo el código. Confirmó 26 y no refutó ninguno:
 
-- **10 en la v1.** Están listados en `LEEME.md`. La v1 se dejó como estaba, para comparar.
+- **10 en la v1.** Están listados en `referencia/LEEME.md`. La v1 se dejó como estaba, para comparar.
 - **12 en la v2, todos corregidos.** Los más importantes: ponerse al día recargaba el chat encima de un formulario a medio llenar; después de terminar un trámite la app seguía creyendo que había uno pendiente; lo que se pedía mandar mientras un chat se recargaba se perdía sin aviso; y «hay algo nuevo» dependía del reloj del teléfono (con el reloj adelantado, la respuesta de una persona podía no avisarse).
 - **4 de seguridad y privacidad.** Dos son de la app y están corregidos (el texto de los mensajes de la obra social a la vista en el inicio; «borrar mis conversaciones» no llegaba a otra ventana abierta). Los otros dos son un problema de la plataforma, que está en la sección 9, punto 1.
 
@@ -142,7 +142,7 @@ Las pruebas quedaron en `pruebas/` para repetirlas.
 
 ## 8. Pendientes de decisión
 
-1. **Qué versión se publica.** La elección de fondo es entre las dos pieles nuevas: la **v3** (estilo sitio de Mavic) o la **v4** (estilo FitApp). Por dentro son iguales, así que se elige por cómo se ve; la v3 identifica al grupo con el color de Mavic, la v4 con los de temacy. Desde el 18-11 hay una tercera, la **v5**: la v3 sin el color de ninguna entidad (neutra), que es la que resuelve esa objeción. Cualquiera de las dos (y la v2) mete el chat dentro de un marco y el teclado del teléfono pasa a manejarlo la app: hay que verla en un Android y en un iPhone antes de publicar. La v1 queda como plan B.
+1. **Qué versión se publica: resuelto el 18-11, va la v5.** La elección era entre las pieles nuevas: la **v3** (estilo sitio de Mavic), la **v4** (estilo FitApp) y la **v5**, que es la v3 sin el color de ninguna entidad (neutra) y resolvía la objeción a la v3. Por dentro son iguales, así que se eligió por cómo se ve. Sigue pendiente lo que vale para todas las que meten el chat dentro de un marco: el teclado del teléfono pasa a manejarlo la app, y hay que verla en un Android y en un iPhone antes de publicar. La v1 queda como plan B.
 2. **Subdominio y marca del grupo.** La app usa un nombre provisorio («Atención al afiliado»).
 3. **Padrones de Mavic y de Ospevic:** si existen con DNI y con teléfono o email, y en qué formato. Sin eso no hay paso 1.2 para esas entidades.
 4. **Responsable del login del grupo:** qué entidad figura como responsable de los datos que guarda (DNI, teléfono, email) y firma el aviso de privacidad. Hoy el grupo no es un cliente y no tiene datos propios, a propósito.
@@ -164,7 +164,7 @@ Salió de estudiar el chat y el servidor para hacer la app. No es de la app, per
 5. **No se puede medir cuánto se usa la app.** La app marca cada conversación como venida de `app_grupo`, pero para estas tres entidades (vertical `gremial`) la plataforma descarta ese dato y el ticket no tiene dónde guardarlo. Dos salidas: guardar el origen en el ticket, o darle a la app una clave de chat propia por entidad.
 6. **El historial trae los 200 mensajes más viejos, no los últimos** (`ORDER BY m.id ASC LIMIT 200`). En una conversación larga, al recargar no aparece lo más reciente.
 7. **Defectos del chat que la v2 esquiva pero siguen para cualquier otro sitio:** si se lo abre antes de que termine de configurarse, pide la configuración dos veces y le quedan duplicados los botones de voz y micrófono (le pasa a la v1); cuando agota los reintentos de conexión en vivo queda consultando cada 4 segundos para siempre, también con la credencial vencida; al reconectar no vuelve a traer lo que llegó durante el corte; mientras consulta así, muestra dos veces cada respuesta del bot (una al recibirla y otra al consultar); «Ahora no» en un trámite lo saca de la vista pero el servidor lo deja pendiente; da por hecho que la página que lo aloja usa `box-sizing: border-box` (en una que no, las tarjetas de trámite se salen 28 px de la pantalla); no tiene modo oscuro.
-8. **nginx no pasa la IP real fuera de `/api/`** (`/privacidad/`, `/brands/`, `/uploads/`, `/widget.js`, `/socket.io/`): el freno de `/privacidad/` cuenta a todos como una sola IP. La propuesta de nginx para el subdominio ya la pasa en todas.
+8. **nginx no pasa la IP real fuera de `/api/`** (`/privacidad/`, `/brands/`, `/uploads/`, `/widget.js`, `/socket.io/`): el freno de `/privacidad/` cuenta a todos como una sola IP. El servidor que publique la app tiene que pasarla en todas.
 
 ## 10. Sin verificar al 17-11
 
@@ -172,5 +172,5 @@ Salió de estudiar el chat y el servidor para hacer la app. No es de la app, per
 - Cuánto contenido propio tiene hoy la Biblioteca de Mavic.
 - El lado servidor se leyó de la copia local, y **el `main` de esta PC está atrasado respecto de producción**: el `git fetch` a Bitbucket falla por credenciales, y el chat que corre en producción tiene cambios del 05-11 y el 06-11 que acá no están. El chat sí se estudió en su versión de producción (bajada de `app.temacy.ar/widget.js`). La rama `feat/webapp-grupo-20261117` salió del `origin/main` que había en esta PC (`86d13ccf`, del 28-10).
 - El teléfono de relleno «351000000» que da el bot de Suvico en local: no se verificó si sigue en producción.
-- La propuesta de nginx (`nginx-subdominio.ejemplo.conf`) no se probó contra el servidor.
+- La configuración del servidor para publicar la app no está en este repo (18-11: desde acá sólo se sube el código). Lo que el servidor tiene que hacer está en `LEEME.md`, «Antes de publicarla».
 - De «Mi protección SUVICO» sólo se leyeron las fichas de las tiendas: no se sabe cómo decide que alguien es vigilador (si consulta algún padrón), cuánta gente la usa de verdad ni si Suvico la sigue manteniendo.
