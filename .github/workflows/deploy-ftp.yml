@@ -3,7 +3,7 @@
 #    Si no, publica los archivos del repo tal cual (sitio estático).
 #    Si todavía no hay index.html, publica una página de "Próximamente".
 # 2) Agrega <meta name="robots" content="noindex"> a cada HTML y un .htaccess
-#    con noindex + rewrite para SPA (las rutas internas vuelven a index.html).
+#    con noindex y sin caché para index/sw.js. Revisa que estén los archivos de sw.js.
 # 3) Sube por FTP. La cuenta FTP tiene como raíz public_html/web/suvico-app,
 #    por eso server-dir es ./ (no puede tocar otras carpetas del sitio).
 name: Deploy a web.temacy.com/suvico-app
@@ -56,11 +56,24 @@ jobs:
               if [ -f "$d/index.html" ]; then cp -a "$d/." _publicar/; break; fi
             done
           else
-            rsync -a --exclude '.git*' --exclude '.github' --exclude '_publicar' --exclude 'README.md' ./ _publicar/
+            # Solo la app: docs/, referencia/, pruebas/, servidor-local.js y los .md
+            # son herramientas de trabajo (ver LEEME.md).
+            rsync -a --exclude '.git*' --exclude '.github' --exclude '_publicar' \
+              --exclude 'docs' --exclude 'referencia' --exclude 'pruebas' \
+              --exclude 'servidor-local.js' --exclude '*.md' ./ _publicar/
           fi
           if [ ! -f _publicar/index.html ]; then
             echo "::warning::Todavía no hay app; se publica una página de 'Próximamente'."
             cp .github/deploy/proximamente.html _publicar/index.html
+          fi
+          # El service worker solo se actualiza si están TODOS los archivos de su lista.
+          if [ -f _publicar/sw.js ]; then
+            faltan=0
+            for a in $(sed -n "/const ARCHIVOS/,/];/p" _publicar/sw.js | grep -o "'[^']*'" | tr -d "'"); do
+              [ -z "$a" ] && continue
+              [ -f "_publicar/$a" ] || { echo "::error::Falta $a (está en la lista de sw.js)"; faltan=1; }
+            done
+            [ "$faltan" = 0 ] || exit 1
           fi
           echo "hay=si" >> "$GITHUB_OUTPUT"
           cp .github/deploy/htaccess _publicar/.htaccess
