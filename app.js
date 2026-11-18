@@ -854,18 +854,59 @@
    * números arriba para poder mandar una captura.
    */
   var vv = window.visualViewport, depurador = null;
-  if (/[?&]depurar=1/.test(location.search)) {
+  function alternarDepurador() {
+    if (depurador) { depurador.remove(); depurador = null; return; }
     depurador = el('div');
-    depurador.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:99;padding:2px 6px;background:#000;color:#0f0;font:11px monospace;pointer-events:none';
+    depurador.style.cssText = 'position:absolute;top:env(safe-area-inset-top);left:0;right:0;z-index:99;padding:2px 6px;background:#000;color:#0f0;font:11px monospace;pointer-events:none';
     app.appendChild(depurador);
+    if (vv) ajustarAlto();
   }
+  // Anclada al inicio del teléfono no hay dónde escribir `?depurar=1`: cinco toques seguidos en el
+  // nombre de la app (arriba de todo) prenden y apagan los números.
+  (function () {
+    var rotulo = document.querySelector('[data-app-nombre]'), toques = 0, reloj = 0;
+    if (!rotulo) return;
+    rotulo.addEventListener('click', function () {
+      toques++;
+      clearTimeout(reloj);
+      reloj = setTimeout(function () { toques = 0; }, 1500);
+      if (toques >= 5) { toques = 0; alternarDepurador(); }
+    });
+  }());
+
+  /* iPhone, con la app anclada al inicio. Ahí la app se dibuja también detrás de la barra de estado
+   * (la hora, la batería), y iOS le informa un alto de pantalla MÁS CORTO que el real: le descuenta
+   * esa barra, pero igual dibuja la página desde arriba de todo. Como la app se ajusta al alto que
+   * le informan, quedaba corta: las pestañas flotando sobre el contenido y un hueco abajo (se vio
+   * el 18-11-2026 en un iPhone, ya publicada). Se lo reconoce por su firma: la app está anclada, no
+   * hay teclado, y lo que falta para llenar la pantalla es justo el alto de la barra de estado. En
+   * ese caso se suma lo que falta. En cualquier otro, no se toca nada.
+   */
+  var sonda = null;
+  function barraDeEstado() {
+    if (!sonda) {
+      sonda = el('div');
+      sonda.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top);visibility:hidden;pointer-events:none';
+      document.body.appendChild(sonda);
+    }
+    return sonda.getBoundingClientRect().height;
+  }
+  function faltaAbajo() {
+    if (navigator.standalone !== true) return 0;       // sólo existe en iOS, y sólo es `true` con la app anclada
+    var vertical = window.innerHeight >= window.innerWidth;
+    var pantalla = vertical ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    var falta = pantalla - vv.height, barra = barraDeEstado();
+    return barra > 0 && Math.abs(falta - barra) <= 3 ? falta : 0;
+  }
+
   function ajustarAlto() {
     // Con zoom de pellizco lo visible también se achica, y no es el teclado: no se toca nada.
     var conZoom = Math.abs((vv.scale || 1) - 1) > 0.01;
     var abierto = !conZoom && vv.height < window.innerHeight * 0.78;
+    var sumado = conZoom || abierto ? 0 : faltaAbajo();
     if (conZoom) { app.style.removeProperty('--alto'); app.style.transform = ''; }
     else {
-      app.style.setProperty('--alto', Math.round(vv.height) + 'px');
+      app.style.setProperty('--alto', Math.round(vv.height + sumado) + 'px');
       app.style.transform = vv.offsetTop ? 'translateY(' + Math.round(vv.offsetTop) + 'px)' : '';
     }
     if (abierto !== teclado) {
@@ -874,8 +915,14 @@
       if (!teclado) ubicarLuz();
       E.forEach(function (e) { decir(e, { tipo: 'teclado', abierto: teclado }); });
     }
-    if (depurador) depurador.textContent = 'visible ' + Math.round(vv.height) + ' · ventana ' + window.innerHeight + ' · corrida ' + Math.round(vv.offsetTop) + ' · zoom ' + (vv.scale || 1).toFixed(2) + ' · teclado ' + (teclado ? 'sí' : 'no');
+    if (depurador) {
+      depurador.textContent = 'visible ' + Math.round(vv.height) + ' · ventana ' + window.innerWidth + '×' + window.innerHeight +
+        ' · pantalla ' + screen.width + '×' + screen.height + ' · barra ' + Math.round(barraDeEstado()) + ' · sumado ' + Math.round(sumado) +
+        ' · anclada ' + (navigator.standalone === true ? 'sí' : navigator.standalone === false ? 'no' : '—') +
+        ' · corrida ' + Math.round(vv.offsetTop) + ' · zoom ' + (vv.scale || 1).toFixed(2) + ' · teclado ' + (teclado ? 'sí' : 'no');
+    }
   }
+  if (/[?&]depurar=1/.test(location.search)) alternarDepurador();
   if (vv) {
     var pendiente = false;
     var diferir = function () { if (pendiente) return; pendiente = true; requestAnimationFrame(function () { pendiente = false; ajustarAlto(); }); };

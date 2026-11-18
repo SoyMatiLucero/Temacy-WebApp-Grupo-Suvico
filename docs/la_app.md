@@ -28,7 +28,9 @@ Todo lo demás: el movimiento y sus reglas, las tipografías (Cabinet Grotesk y 
 
 - `pruebas/recorrido-delicado.js`: todo en verde (18-11-2026, cuando todavía estaba en `v5/`; pasarla a la raíz no cambió su código).
 - Capturas en teléfono y escritorio: inicio, búsqueda, entrar a un chat, pasar de un chat a otro y volver; sin errores de consola ni pedidos rechazados.
-- No se probó en teléfonos reales.
+- En un iPhone real, anclada al inicio (18-11-2026, ya publicada): las pestañas quedaban flotando a media pantalla, con un hueco abajo. iOS le informa a la app anclada una pantalla más corta que la real (le descuenta la barra de estado). Se corrigió en `app.js` («faltaAbajo»): **falta confirmarlo en el teléfono.** La cuenta está comprobada con el caso simulado de `pruebas/dispositivos.js`.
+- Ronda por once tamaños de pantalla (`pruebas/dispositivos.js`), en verde.
+- Del resto de lo que pide un teléfono real (teclado, micrófono, adjuntar) no se probó nada.
 
 ## Pendiente
 
