@@ -51,7 +51,12 @@ const A_LA_PLATAFORMA = [
 const LOCAL = ['127.0.0.1', 'localhost', '::1'];
 // Adónde redirigir: a la API. Si la API es de esta máquina y el pedido vino por la red local (RED=1),
 // se arma con el nombre por el que llegó el pedido, para que el teléfono la encuentre.
+// Por un túnel (ngrok y parecidos) nada de eso sirve: quien entra de afuera no alcanza la API de esta
+// máquina. Con PLATAFORMA=https://… lo que llega por el túnel se redirige a ese sitio público, que es
+// donde están los logos. Los archivos que mande el bot LOCAL no existen ahí y dan 404.
+const PUBLICA = /^https?:\/\/[^/]+\/?$/.test(process.env.PLATAFORMA || '') ? process.env.PLATAFORMA.replace(/\/$/, '') : '';
 function plataforma(req) {
+  if (PUBLICA && (req.headers['x-forwarded-host'] || req.headers['x-forwarded-for'])) return PUBLICA;
   const maquina = String(req.headers.host || '').replace(/:\d+$/, '');
   return LOCAL.includes(API.hostname) && maquina && !LOCAL.includes(maquina) ? `http://${maquina}:${API.port}` : API.origin;
 }
