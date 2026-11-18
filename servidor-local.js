@@ -40,7 +40,7 @@ const puertoDe = (version) => (version === LA_APP ? PUERTO_APP : 4500 + 10 * Num
 const carpetaDe = (version) => (version === LA_APP ? BASE : path.join(REFERENCIA, version));
 // La app comparte la raíz con cosas que no son de ella (los documentos, las pruebas, las versiones
 // de referencia, este archivo). Por el puerto de la app no se sirven: tampoco se publican.
-const FUERA_DE_LA_APP = /^(referencia|pruebas|docs)\/|^servidor-local\.js$|(^|\/)\./i;
+const FUERA_DE_LA_APP = /^(referencia|pruebas|docs|herramientas)\/|^servidor-local\.js$|(^|\/)\./i;
 
 // SÓLO lo que el chat necesita, que es lo mismo que tiene que hacer el servidor que la publique
 // (ver LEEME.md). El resto de la API de la plataforma no se expone en este dominio: si el chat

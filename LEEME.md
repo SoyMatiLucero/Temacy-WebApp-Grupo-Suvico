@@ -16,9 +16,11 @@ Este repo es sólo la app. El chat (`/widget.js`) y su API (`/api/web-chat/`) lo
 | `docs/plan_webapp.md` | El plan. |
 | `referencia/` | Las cuatro versiones anteriores (`v1` a `v4`), guardadas para consultarlas. No se mantienen. Qué es cada una y en qué se diferencian: `referencia/LEEME.md`. |
 | `pruebas/` | Recorridos de la app como usuario, en un navegador de verdad. |
+| `herramientas/` | La imagen que se ve al compartir el enlace (`compartir.html`) y el guion que la genera en `icons/compartir.png`. |
 | `servidor-local.js` | Para verla en esta máquina. |
+| `.github/` | El deploy automático: cada push a `main` publica la app en `web.temacy.com/suvico-app/`. |
 
-La app es la versión elegida el 18-11-2026: la quinta que se hizo, la «neutra» (base grafito, luz blanca, y el color sólo en lo que es de cada entidad). Hasta ese día vivía en la carpeta `v5/`; ahora sus archivos están en la raíz del repo. Las carpetas `docs/`, `referencia/` y `pruebas/`, `servidor-local.js` y los `.md` no son parte de la app: son documentos y herramientas de trabajo.
+La app es la versión elegida el 18-11-2026: la quinta que se hizo, la «neutra» (base grafito, luz blanca, y el color sólo en lo que es de cada entidad). Hasta ese día vivía en la carpeta `v5/`; ahora sus archivos están en la raíz del repo. Las carpetas `docs/`, `referencia/`, `pruebas/` y `herramientas/`, `servidor-local.js` y los `.md` no son parte de la app: son documentos y herramientas de trabajo, y no se publican.
 
 ## Verla en esta máquina
 
@@ -65,17 +67,19 @@ Sin `URL` prueban la app (`http://127.0.0.1:4550/`). También sirven para la v2,
 PLAYWRIGHT=<carpeta de playwright> node pruebas/directo.js
 ```
 
-## Antes de publicarla
+## Publicarla
 
-Este repo guarda el código; la publicación no se hace desde acá. La app son archivos estáticos: alcanza con publicarlos en cualquier servicio de páginas con https, sin un servidor propio en el medio. Lo que tiene que saber quien la publique:
+**Un push a `main` es un cambio en producción.** El workflow `.github/workflows/deploy-ftp.yml` publica la app sola, por FTP, en `https://web.temacy.com/suvico-app/`. Por eso todo se prueba antes en esta máquina. La app son archivos estáticos: no hay servidor propio en el medio. Lo que hay que saber:
 
-1. **Qué se publica:** sólo los archivos de la app, en la raíz de un dominio o subdominio propio. Son los de la lista `ARCHIVOS` de `sw.js`, más el propio `sw.js`. No se publican `docs/`, `referencia/`, `pruebas/`, `servidor-local.js` ni los `.md`.
-2. **Los chats: el script de cada entidad.** Cada entidad tiene su script del chat, el que da la plataforma para pegar en un sitio (`<script src="https://app.temacy.ar/widget.js" data-key="wk_…" async>`). Sus dos datos están en `entidades.js` (`guion` y `clave`), y la app publicada lo carga directo desde la plataforma. Para que funcione, **el dominio donde se publique la app tiene que estar cargado como sitio permitido del chat web de cada una de las tres entidades** (panel de la plataforma › ficha del cliente › Chat web). A la entidad que no lo tenga, la plataforma la rechaza y la app la muestra como «No disponible por ahora».
-3. **Con https.** Sin https no hay modo sin conexión, ni instalación, ni micrófono.
-4. **Que estén todos los archivos** de la lista de `sw.js`: si falta uno, los teléfonos no se actualizan.
-5. **Probarla en teléfonos reales**, que todavía no se hizo: teclado, micrófono, adjuntar, instalar, y las transiciones entre vistas en iPhone.
-6. **Tipografías:** confirmar la licencia antes de publicar (ver `referencia/v3/LEEME.md`, «Tipografías»: la app usa las mismas).
+1. **Qué se publica:** sólo los archivos de la app (los `.html`, `.js` y `.css` de la raíz, el manifiesto, `icons/` y `fuentes/`: la lista `ARCHIVOS` de `sw.js`, más el propio `sw.js` y la imagen para compartir). El workflow deja afuera todo lo demás: `docs/`, `referencia/`, `pruebas/`, `herramientas/`, `servidor-local.js` y los `.md`. Un archivo nuevo de la app en una carpeta nueva hay que sumarlo ahí.
+2. **Los chats: el script de cada entidad.** Cada entidad tiene su script del chat, el que da la plataforma para pegar en un sitio (`<script src="https://app.temacy.ar/widget.js" data-key="wk_…" async>`). Sus dos datos están en `entidades.js` (`guion` y `clave`), y la app publicada lo carga directo desde la plataforma. Para que funcione, **el dominio donde se publique la app tiene que estar cargado como sitio permitido del chat web de cada una de las tres entidades** (panel de la plataforma › ficha del cliente › Chat web). A la entidad que no lo tenga, la plataforma la rechaza y la app la muestra como «No disponible por ahora». Para `https://web.temacy.com` las tres ya contestan bien (comprobado el 18-11-2026).
+3. **Compartir el enlace:** el título, la descripción y la imagen de la vista previa están en el `<head>` de `index.html`, con la dirección completa de la app. Si cambia de dominio, hay que cambiarla ahí.
+4. **Fuera de Google, por ahora:** `index.html` y el `.htaccess` del deploy piden que no se indexe. Compartir el enlace funciona igual.
+5. **Con https.** Sin https no hay modo sin conexión, ni instalación, ni micrófono.
+6. **Que estén todos los archivos** de la lista de `sw.js`: si falta uno, los teléfonos no se actualizan.
+7. **Probarla en teléfonos reales**, que todavía no se hizo: teclado, micrófono, adjuntar, instalar, y las transiciones entre vistas en iPhone.
+8. **Tipografías:** confirmar la licencia (ver `referencia/v3/LEEME.md`, «Tipografías»: la app usa las mismas).
 
-**La otra forma, sin los scripts.** Si a una entidad se le saca el `guion` en `entidades.js`, la app pide su chat al mismo dominio de la app. Sirve para publicarla detrás de un servidor que haga lo que hace `servidor-local.js`: reenviar a la API de la plataforma sólo lo que usa el chat (`/api/web-chat/`, `/socket.io/`, `/widget.js`) conservando el `Host` del pedido, y **redirigir** (no reenviar) al dominio de la plataforma lo que es contenido subido (`/uploads/`, `/brands/`, `/privacidad/`). Lo segundo es de seguridad: en el dominio de la app quedan guardadas las credenciales de las tres conversaciones, y ahí no se sirve nada que haya subido nadie. Ojo además: en el servidor de la plataforma, un subdominio que apunte a la máquina sin su propio bloque de nginx cae en el bloque general y muestra el panel de gestión.
+**La otra forma, sin los scripts.** Si a una entidad se le saca el `guion` en `entidades.js`, la app pide su chat al mismo dominio de la app. Sirve para publicarla detrás de un servidor propio que haga lo que hace `servidor-local.js`: reenviar a la API de la plataforma sólo lo que usa el chat (`/api/web-chat/`, `/socket.io/`, `/widget.js`) conservando el `Host` del pedido, y **redirigir** (no reenviar) al dominio de la plataforma lo que es contenido subido (`/uploads/`, `/brands/`, `/privacidad/`). Lo segundo es de seguridad: en el dominio de la app quedan guardadas las credenciales de las tres conversaciones, y ahí no se sirve nada que haya subido nadie. Ojo además: en el servidor de la plataforma, un subdominio que apunte a la máquina sin su propio bloque de nginx cae en el bloque general y muestra el panel de gestión.
 
 Lo que hay que resolver en la plataforma, que no es de la app, está en `docs/plan_webapp.md`, sección 9.
