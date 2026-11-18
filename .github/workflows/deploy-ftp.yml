@@ -69,6 +69,16 @@ jobs:
           done
           ls -la _publicar
 
+      - name: Diagnóstico de conexión FTP
+        if: steps.juntar.outputs.hay == 'si'
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          echo "Largo del host cargado: ${#FTP_SERVER}"
+          echo "IP del host cargado:   $(getent hosts "$FTP_SERVER" | awk '{print $1}' | head -1)"
+          echo "IP de ftp.temacy.com:  $(getent hosts ftp.temacy.com | awk '{print $1}' | head -1)"
+          timeout 10 bash -c "</dev/tcp/$FTP_SERVER/21" && echo "Puerto 21 abierto" || echo "Puerto 21 NO responde"
+
       - name: Subir por FTP
         if: steps.juntar.outputs.hay == 'si'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
