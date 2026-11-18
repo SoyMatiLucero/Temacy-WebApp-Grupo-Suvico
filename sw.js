@@ -14,9 +14,17 @@
  *      y borra la anterior. Si no, no se instala: queda la anterior y se vuelve a intentar la
  *      próxima vez que se abra la app. Así nunca hay una mezcla de versiones a medio bajar;
  *   3. pasados diez minutos, la próxima vez que se abra la app, vuelve a bajar una vez el código y
- *      las páginas derecho de la red. Es por si la primera bajada agarró al servidor a mitad de
- *      una publicación (el hosting copia los archivos de a uno). Después no pide nada más.
+ *      las páginas. Es por si la primera bajada agarró al servidor a mitad de una publicación (el
+ *      hosting copia los archivos de a uno, y del código no hay cómo saber de qué publicación
+ *      es). Después no pide nada más.
  * Si a la copia le falta un archivo (el teléfono la borró para hacer lugar), se arma de nuevo.
+ *
+ * Lo que esto no arregla solo: si una publicación queda a medio copiar en el servidor MÁS de diez
+ * minutos, un teléfono puede quedarse con una mezcla. Volver a publicar el mismo commit no lo
+ * corrige (este archivo saldría igual): hay que publicar un commit nuevo, aunque sea vacío.
+ *
+ * Una página nueva de la app tiene que llevar `?v=` y el sello en lo que carga, como index.html, y
+ * sumarse a los archivos que sella el deploy. Si no, de esa página no se comprueba nada.
  *
  * En una máquina de desarrollo no hay sello: ahí la copia se renueva entera al abrir la app y, como
  * mucho, cada diez minutos.
@@ -54,33 +62,36 @@ const PAGINA = /^$|\.html$/;
 const NOTA = BASE + '__nota';
 const CADA_MS = 10 * 60 * 1000;
 const ESPERA_MS = 10 * 60 * 1000;
-let ultimaVez = 0;
+let ultimaVez = 0;        // cuándo se miró por última vez si había algo que hacer
+let ultimaFalta = 0;      // cuándo se salió por última vez a rearmar la copia porque faltaba un archivo
 let alDia = false;
 let enCurso = null;
 
-function pedir(archivo, deLaRed) {
+function pedir(archivo) {
   const ruta = BASE + archivo;
   if (!SELLADA) return fetch(ruta + '?v=' + SELLO, { cache: 'no-cache' });
   if (FIJO.test(archivo)) return fetch(ruta);
-  // Las páginas siempre, y todo lo demás en una actualización o en la segunda bajada, derecho del
-  // servidor: sin la caché del navegador y con una dirección que ningún intermediario pudo guardar.
-  if (deLaRed || PAGINA.test(archivo)) return fetch(ruta + '?v=' + SELLO + '&r=' + Date.now(), { cache: 'no-store' });
-  // Queda el código en la primera instalación: la página lo acaba de bajar con esta misma
-  // dirección, y se toma de ahí en vez de bajarlo otra vez.
-  return fetch(ruta + '?v=' + SELLO, { cache: 'force-cache' });
+  // Las páginas y el código, siempre derecho del servidor: sin la caché del navegador (ahí puede
+  // haber quedado lo que bajó un intento anterior, con el servidor a medio copiar) y con una
+  // dirección que ningún intermediario pudo haber guardado.
+  return fetch(ruta + '?v=' + SELLO + '&r=' + Date.now(), { cache: 'no-store' });
 }
 
+// ¿Es de esta publicación? Sólo se puede saber de las páginas, por el sello que llevan en las
+// direcciones de lo que cargan: si traen el de otra, el servidor está a mitad de una publicación.
+// Una página que no lleva ningún sello no se puede comprobar y se da por buena: rechazarla dejaría
+// a todos los teléfonos sin poder instalar nunca más una versión nueva.
 function esDeEstaPublicacion(archivo, respuesta) {
   if (!SELLADA || !PAGINA.test(archivo)) return Promise.resolve(true);
-  return respuesta.clone().text().then((texto) => texto.indexOf('?v=' + SELLO) >= 0);
+  return respuesta.clone().text().then((texto) => (texto.match(/\?v=[0-9a-f]{6,40}\b/g) || []).every((s) => s === '?v=' + SELLO));
 }
 
 // Trae todos los archivos y, sólo si llegaron todos y son de esta publicación, los guarda.
 // Devuelve una promesa con true si la copia quedó al día.
-function ponerAlDia(deLaRed) {
+function ponerAlDia() {
   if (enCurso) return enCurso;
   enCurso = (async () => {
-    const respuestas = await Promise.all(ARCHIVOS.map((a) => pedir(a, deLaRed)));
+    const respuestas = await Promise.all(ARCHIVOS.map((a) => pedir(a)));
     if (respuestas.some((r) => !r.ok)) return false;          // faltó alguno: se deja la copia como estaba
     const propias = await Promise.all(ARCHIVOS.map((a, i) => esDeEstaPublicacion(a, respuestas[i])));
     if (propias.some((si) => !si)) return false;              // el servidor está a mitad de una publicación
@@ -100,31 +111,36 @@ function anotar(nota) {
 }
 
 // Lo que hay que hacer por detrás cuando se abre la app. «falta»: se pidió un archivo de la app
-// y no estaba en la copia.
+// y no estaba en la copia; ahí se sale a rearmarla sin esperar a nada (como mucho, cada diez minutos).
 function revisar(falta) {
-  if (falta) alDia = false;
-  if (alDia || Date.now() - ultimaVez < CADA_MS) return Promise.resolve();
-  ultimaVez = Date.now();
-  if (!SELLADA) return ponerAlDia(false);
-  return (falta ? Promise.resolve(null) : leerNota()).then((nota) => {
-    if (nota && nota.revisada) { alDia = true; return; }
-    const edad = nota ? Date.now() - nota.en : -1;
-    if (edad >= 0 && edad < ESPERA_MS) return;                // recién instalada: todavía no
-    return ponerAlDia(true).then((llego) => {
+  const ahora = Date.now();
+  if (falta) {
+    if (ahora - ultimaFalta < CADA_MS) return Promise.resolve();
+    ultimaFalta = ahora;
+  } else if (alDia || ahora - ultimaVez < CADA_MS) return Promise.resolve();
+  ultimaVez = ahora;
+  if (!SELLADA) return ponerAlDia();
+  return leerNota().then((nota) => {
+    let en = nota && typeof nota.en === 'number' ? nota.en : NaN;
+    const revisada = !isNaN(en) && nota.revisada === true;
+    let anotado = Promise.resolve();
+    // Sin nota, o con una fecha que todavía no llegó (el reloj del teléfono estaba corrido), no se
+    // sabe cuándo se armó la copia: la espera para la segunda bajada empieza ahora.
+    if (!revisada && !(Date.now() - en >= 0)) { en = Date.now(); anotado = anotar({ en: en, revisada: false }); }
+    const madura = !revisada && Date.now() - en >= ESPERA_MS;
+    if (revisada && !falta) alDia = true;
+    if (!madura && !falta) return anotado;
+    return anotado.then(() => ponerAlDia()).then((llego) => {
       if (!llego) return;
-      alDia = true;
-      return anotar({ en: Date.now(), revisada: true });
+      if (revisada) alDia = true;                             // sólo hubo que rearmarla
+      else if (madura) { alDia = true; return anotar({ en: en, revisada: true }); }
     });
   }).catch(() => {});
 }
 
 self.addEventListener('install', (e) => {
   ultimaVez = Date.now();
-  // Si ya había una versión andando, todo se baja derecho del servidor: a esta página la sirvió
-  // la copia anterior, y lo que el navegador tenga guardado con el sello nuevo sólo puede venir de
-  // un intento anterior de instalar, quizás con el servidor a medio copiar.
-  const actualizacion = !!self.registration.active;
-  e.waitUntil(ponerAlDia(actualizacion).then((llego) => {
+  e.waitUntil(ponerAlDia().then((llego) => {
     if (llego) return anotar({ en: Date.now(), revisada: false });
     // Publicada, sin la copia entera no se instala: sigue la versión anterior con la suya.
     if (SELLADA) return caches.delete(COPIA).then(() => { throw new Error('la copia no llegó entera'); });
