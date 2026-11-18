@@ -10,8 +10,9 @@ Cada versión vive en su carpeta, para poder compararlas:
 | `v2/` | La versión mejorada (17-11-2026): una sola app con los tres chats vivos adentro. Cómo está hecha: `v2/LEEME.md`. Funciona bien pero no gustó cómo se ve: sobria y sin movimiento. |
 | `v3/` | Propuesta «de noche» (17-11-2026): la v2 con el estilo del sitio de Mavic y con movimiento. `v3/LEEME.md`. |
 | `v4/` | Propuesta «bosque y lima» (17-11-2026): la v2 con el estilo de FitApp y con movimiento. `v4/LEEME.md`. |
+| `v5/` | La v3 «neutra» (18-11-2026): mismo contenido y movimiento, sin el color de Mavic. Base grafito, luz blanca, y el color sólo en lo que es de cada entidad. `v5/LEEME.md`. |
 
-La v3 y la v4 son la misma app por dentro (la lógica de la v2) con dos pieles distintas: hay que elegir una.
+La v3, la v4 y la v5 son la misma app por dentro (la lógica de la v2) con pieles distintas: hay que elegir una. La v5 salió de la v3: gustó, pero su inicio parecía el sitio de Mavic.
 
 ## Verlas en esta máquina
 
@@ -25,6 +26,7 @@ API=http://127.0.0.1:3110 node web_grupo/servidor-local.js
 - v2: `http://127.0.0.1:4520`
 - v3: `http://127.0.0.1:4530`
 - v4: `http://127.0.0.1:4540`
+- v5: `http://127.0.0.1:4550`
 - dos versiones lado a lado, como teléfono o como escritorio: `http://127.0.0.1:4505` (arranca con las dos últimas y deja elegir cuáles)
 
 Con `RED=1` adelante escucha también en la red local, para abrirla desde un teléfono (ahí no hay modo sin conexión ni micrófono: el navegador los reserva para https).
