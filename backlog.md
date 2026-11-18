@@ -42,16 +42,10 @@ Sin esto no se puede publicar nada de lo que sigue.
 
 - [ ] **El deploy está fallando.** Desde el 18-11 la app se publica copiándola al repo `temacy-webs` (el hosting borraba lo que se subía por FTP). El primer deploy con ese camino falló en el paso «Copiar la app a temacy-webs»; lo más probable es que falte cargar el secret `WEBS_TOKEN`, y el registro del run lo dice. Lo resuelve quien administra los repos.
   *Listo cuando:* un push a `main` termina en verde y `sw.js` publicado trae el sello de ese commit.
-- [ ] **La vista previa al compartir no aparece en WhatsApp** (se ve sólo el dominio). La página y la imagen responden bien a WhatsApp, Facebook, Telegram y Twitter cuando se las pide desde afuera, así que quedan dos causas:
-  1. WhatsApp guardó un intento de cuando la app estuvo caída. Se comprueba pegando el enlace con algo atrás (`…/suvico-app/?1`): si ahí aparece, era eso y se arregla solo en unos días.
-  2. El `robots.txt` de la raíz del dominio (está en `temacy-webs`) le prohíbe todo a todos, y los servidores de Meta lo respetan. Se arregla dejando pasar a `/suvico-app/` a los que arman vistas previas (`facebookexternalhit`, `WhatsApp`, `Twitterbot`, `TelegramBot`), sin sacar el «no indexar».
-
-  El depurador de enlaces de Meta dice cuál de las dos es.
-  *Listo cuando:* al pegar el enlace en WhatsApp se ven el título, la descripción y la imagen.
+- [x] **La vista previa al compartir en WhatsApp.** Comprobado el 18-11: al enviar el enlace se ven el título, la descripción y la imagen. Mientras se lo está escribiendo, WhatsApp puede mostrar sólo el dominio un rato: tarda en armarla. El `robots.txt` de la raíz del dominio no la bloquea.
 - [ ] **Confirmar en un iPhone, con la app anclada, que las pestañas quedan abajo.** El arreglo está publicado y sólo está comprobado por simulación.
   *Listo cuando:* alguien lo ve bien en el teléfono (abrir, cerrar y volver a abrir). Si no, cinco toques en el nombre de la app muestran los números para mandar.
-- [ ] **Poner al día `LEEME.md` y `CLAUDE.md`.** Todavía describen la publicación por FTP y dan por pendientes dos cambios del workflow que ya están aplicados. Borrar `docs/workflow-pendiente.patch`.
-  *Listo cuando:* lo que dicen sobre publicar coincide con `.github/workflows/deploy-ftp.yml`.
+- [x] **Poner al día `LEEME.md` y `CLAUDE.md`.** Hecho el 18-11: describen la publicación por `temacy-webs` y se borró `docs/workflow-pendiente.patch`, que ya estaba aplicado.
 
 ## Sprint 1 — Que no baje lo que no hace falta
 

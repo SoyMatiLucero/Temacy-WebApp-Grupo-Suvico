@@ -20,6 +20,8 @@ Leé `CLAUDE.md` y la sección «Pruebas» de `LEEME.md` antes de empezar.
 2. Corré **una prueba por vez**, nunca dos juntas ni mientras corre otra cosa pesada. Esta PC se cuelga con carga alta.
    - `node pruebas/recorrido.js rapido`: el recorrido sin mandar mensajes. Es el mínimo.
    - `node pruebas/directo.js`: la app como publicada, con el script de cada entidad. Corréla si se tocó `comun.js`, `charla.js` o `entidades.js`.
+   - `node pruebas/copia.js`: el service worker como queda publicado (con sello), que en esta máquina se porta distinto. No necesita la API ni el servidor local. Corréla si se tocó `sw.js` o la lista de archivos de la app.
+   - `node pruebas/rendimiento.js`: cuánto tarda y cuánto pesa. No dice si algo anda o no: informa números para comparar con los de `backlog.md`. Corréla si te la piden.
    - `node pruebas/recorrido.js` y `node pruebas/recorrido-delicado.js` mandan mensajes reales a los bots locales y dejan conversaciones de prueba en la base local: corrélas sólo si te lo pidieron o si el cambio toca el envío de mensajes, los trámites o los avisos.
 3. Pasá `SALIDA=<carpeta temporal>` para las capturas y **miralas** con Read: una prueba en verde no dice si la pantalla se ve bien. Fijate en textos cortados, cosas encimadas, logos rotos, y que el teléfono (390×844) y el escritorio (1366×768) se vean enteros.
 4. Si algo falla, repetí esa prueba una vez para separar lo que falla siempre de lo que falla a veces.

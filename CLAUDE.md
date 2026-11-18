@@ -6,11 +6,12 @@ Respondé en español rioplatense. Los documentos, los comentarios y los nombres
 
 ## Un push a `main` publica en producción
 
-`.github/workflows/deploy-ftp.yml` sube la app por FTP a `https://web.temacy.com/suvico-app/` en cada push a `main`. Entonces:
+`.github/workflows/deploy-ftp.yml` publica la app en `https://web.temacy.com/suvico-app/` en cada push a `main`. No la sube al hosting: la copia a la carpeta `suvico-app/` del repo `temacy-webs`, y el hosting despliega ese repo sobre `web.temacy.com` borrando lo que no esté en él (por eso ya no va por FTP: el 18-11-2026 ese despliegue borró la app). Entonces:
 
 - **No pushees sin que te lo pidan.** Commitear en local sí, apenas algo esté listo.
 - Antes de pushear, probá en local (ver «Probar») y decí qué se va a publicar.
-- El workflow publica el repo menos `docs/`, `referencia/`, `pruebas/`, `servidor-local.js` y los `.md`: **lo que no esté en esa lista llega al sitio**. Pasarlo a una lista de lo que sí va está pendiente (`docs/workflow-pendiente.patch`; ver LEEME, «Publicarla»).
+- Se publica sólo la app: los `.html`, `.js` y `.css` de la raíz, el manifiesto, `icons/` y `fuentes/`. **Un archivo de la app en otra carpeta no llega al sitio** si no se lo suma al workflow.
+- Después de pushear, mirá que el deploy haya terminado bien y que `sw.js` publicado traiga el sello del commit. Si el sitio entero da 404, el problema está en `temacy-webs` o en el hosting, no acá.
 - Los archivos bajo `.github/workflows/` no se pueden pushear con el token de la PC de desarrollo (no tiene permiso `workflow`): un commit que los toque hace rechazar el push entero. Dejalos en un commit aparte y avisá.
 - El repo es público: no escribas en él claves, datos de personas ni detalles de fallas de seguridad sin arreglar.
 
@@ -22,7 +23,7 @@ Respondé en español rioplatense. Los documentos, los comentarios y los nombres
 | `charla.html`, `charla.js`, `charla.css` | El marco del chat de cada entidad (`charla.html?e=<slug>`). Todo lo que la app sabe del chat por dentro está en `charla.js` (`SEL` y `mirar()`). |
 | `comun.js` | Lo que comparten la app y los marcos: guardar en el teléfono, la configuración del chat, dónde está el chat de cada entidad. |
 | `entidades.js` | Textos, entidades, temas, preguntas y el script del chat de cada entidad (`guion` + `clave`). Es lo que se toca para cambiar contenido. |
-| `sw.js` | Copia sin conexión. **Un archivo nuevo de la app se suma a `ARCHIVOS`**, o los teléfonos no se actualizan. |
+| `sw.js` | Copia sin conexión. **Un archivo nuevo de la app se suma a `ARCHIVOS`**, o los teléfonos no se actualizan. Si cambia el contenido de un ícono o una tipografía, hay que cambiarle el nombre. |
 | `referencia/` | Las versiones v1 a v4, congeladas. No se arreglan ni se publican. |
 | `pruebas/` | Recorridos como usuario con Playwright. |
 | `herramientas/` | La imagen para compartir el enlace y su generador. |
@@ -60,9 +61,14 @@ PLAYWRIGHT=<carpeta de playwright> node pruebas/recorrido.js             # manda
 PLAYWRIGHT=<carpeta de playwright> node pruebas/recorrido-delicado.js    # trámites, teclado, consulta de fondo
 PLAYWRIGHT=<carpeta de playwright> node pruebas/directo.js               # como publicada: el script de cada entidad
 PLAYWRIGHT=<carpeta de playwright> node pruebas/dispositivos.js          # once tamaños de pantalla + iPhone anclado (simulado)
+PLAYWRIGHT=<carpeta de playwright> node pruebas/copia.js                 # sw.js como publicado: la copia y cómo llega una publicación
+PLAYWRIGHT=<carpeta de playwright> node pruebas/rendimiento.js           # cuánto tarda y cuánto pesa (con URL=https://… mide la publicada)
 ```
 
-- `__SELLO__` en `sw.js`, `index.html` y `charla.html` no es un error: es el sello de la publicación, que el deploy va a reemplazar por el identificador del commit (pendiente, ver LEEME). No lo saques ni lo cambies a mano.
+Lo que falta está en `backlog.md`, por sprints; una tarea se tilda cuando cumple su «listo cuando».
+
+- `__SELLO__` en `sw.js`, `index.html` y `charla.html` no es un error: es el sello de la publicación, que el deploy reemplaza por el identificador del commit. No lo saques ni lo cambies a mano, y no lo escribas en otro archivo de la app: el deploy se corta si queda alguno sin reemplazar.
+- Con sello, `sw.js` se porta distinto que en esta máquina (ver su encabezado). Eso sólo lo prueba `pruebas/copia.js`: corrélo si tocás `sw.js`.
 - Un cambio publicado se ve la SEGUNDA vez que se abre la app en el teléfono (la primera abre de la copia guardada).
 
 - Un cambio con interfaz no está terminado con las pruebas en verde: abrí la pantalla, sacá capturas en teléfono y en escritorio y miralas.
