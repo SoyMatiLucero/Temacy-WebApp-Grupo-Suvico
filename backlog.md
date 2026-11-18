@@ -49,19 +49,25 @@ Sin esto no se puede publicar nada de lo que sigue.
 
 ## Sprint 1 — Que no baje lo que no hace falta
 
-Objetivo: primera visita de 569 kB a menos de 220 kB; segunda visita de 81 kB a menos de 5 kB.
+Objetivo: primera visita de 569 kB a menos de 300 kB; segunda visita de 81 kB a menos de 5 kB.
 
-- [ ] **Logos livianos para Mavic y OSPEVIC.** Se muestran en un recuadro de 52 px y pesan 167 kB y 72 kB (el de SUVICO pesa 5 kB). Es un dato, no código: volver a subirlos desde el panel de la plataforma, de 256 px de lado y menos de 15 kB.
-  *Listo cuando:* la primera visita baja menos de 30 kB de la plataforma (hoy 249 kB).
-- [ ] **Dejar que los `.js` y `.css` se guarden.** Hoy el `.htaccess` les pide «sin caché» y este hosting, además, no sabe contestar «no cambió»: los manda enteros cada vez, y su red de distribución no los guarda (responde en ~0,42 s contra ~0,20 s de lo que sí guarda). Ya no hace falta: van con el sello de la publicación en la dirección, así que una publicación nueva es una dirección nueva. Dejar «sin caché» sólo para los `.html`, `sw.js` y el manifiesto.
-  Cuidado: `sw.js` es un `.js` y tiene que seguir sin caché. Comprobar antes que ninguna página pida un `.js` o `.css` sin sello.
-  *Dónde:* `.github/deploy/htaccess`. *Listo cuando:* `app.js?v=<sello>` responde con caché de varios días y la segunda pasada sale de la red de distribución (`x-hcdn-cache-status: HIT`).
-- [ ] **El service worker baja de nuevo sólo cuando hay una publicación nueva.** Hoy, cada vez que se abre la app, vuelve a pedir sus 19 archivos por detrás: 79 kB. Con el sello, `sw.js` cambia en cada publicación y el navegador ya lo revisa solo: alcanza con bajar todo al instalarse. En desarrollo el sello no cambia (`__SELLO__`), así que ahí tiene que seguir refrescando como hoy.
-  Mirar de paso una copia por sello (`grupo-v5-<sello>`), para que el cambio de versión sea de una sola vez y no archivo por archivo.
-  *Dónde:* `sw.js`. Pasa por el agente `revisor` antes de publicarse: un error acá deja teléfonos con una versión vieja. *Listo cuando:* la segunda visita hace 2 pedidos o menos a la app.
-- [ ] **En la primera visita, no bajar dos veces lo mismo.** El service worker pide las tipografías y los íconos con el sello en la dirección; la página los pide sin él, y el navegador los toma por archivos distintos: 142 kB duplicados. Pedirlos por la misma dirección que usa la página y sin forzar la red.
-  Depende de las dos tareas anteriores.
-  *Dónde:* `sw.js`. *Listo cuando:* la primera visita baja menos de 190 kB de la app (hoy 320 kB).
+- [ ] **Logos livianos para Mavic y OSPEVIC.** Se muestran en un recuadro de 52 px y pesan 167 kB y 72 kB (el de SUVICO pesa 5 kB). El de Mavic, además, mide 5979×2000 puntos: para mostrarlo, el teléfono lo abre entero y eso son unos 48 MB de memoria. Es un dato, no código: hay que volver a subirlos desde el panel de la plataforma. Ya están hechos a 480 puntos de ancho (Mavic 18 kB, OSPEVIC 39 kB); sólo falta subirlos.
+  *Listo cuando:* la primera visita baja menos de 70 kB de la plataforma (hoy 249 kB).
+- [ ] **El logo de SUVICO es chico para un teléfono.** Mide 56×57 puntos y en una pantalla ×3 hacen falta unos 156: se ve borroso. No es de rendimiento, pero se arregla en el mismo lugar: subir uno de 256 puntos.
+  *Listo cuando:* en un teléfono el logo de SUVICO se ve nítido.
+- [ ] **El service worker baja de nuevo sólo cuando hay una publicación nueva.** Antes, cada vez que se abría la app, volvía a pedir sus 19 archivos por detrás: 79 kB. Con el sello, `sw.js` cambia en cada publicación y el navegador ya lo revisa solo: alcanza con bajar todo al instalarse, a una copia aparte con el nombre del sello, y repetir la bajada una vez un rato después por si agarró al servidor a medio copiar. En desarrollo sigue refrescando como antes.
+  **Hecho en local el 18-11 y revisado; falta publicarlo.** Lo prueba `pruebas/copia.js`. A cambio de no pedir nada en cada apertura, cada publicación hace bajar el código dos veces a cada teléfono (unos 60 kB cada una).
+  *Dónde:* `sw.js`. *Listo cuando:* publicada, la segunda visita hace 2 pedidos o menos a la app (hoy 19).
+- [ ] **En la primera visita, no bajar dos veces las tipografías.** El service worker pedía las tipografías y los íconos con el sello en la dirección; la página los pide sin él, y el navegador los tomaba por archivos distintos: 96 kB de tipografías duplicados. Ahora los pide por la misma dirección que la página.
+  El código (38 kB) sí se sigue bajando dos veces en la primera visita. Tomarlo de lo que la página ya había bajado resultó inseguro: la revisión encontró dos casos en que quedaba guardado código de la publicación anterior.
+  **Hecho en local el 18-11, en el mismo cambio; falta publicarlo.**
+  *Dónde:* `sw.js`. *Listo cuando:* publicada, la primera visita baja menos de 230 kB de la app (hoy 320 kB).
+- [ ] **Probar una actualización en un iPhone.** El service worker nuevo está probado en Chromium, no en Safari. Después de publicarlo y de una publicación más: abrir la app anclada dos veces y ver que muestra lo nuevo, y que abre en modo avión.
+  *Listo cuando:* alguien lo vio andar en un iPhone.
+- [ ] **(Workflow) Que el sello salga de lo que se publica y no del commit.** Hoy cualquier push a `main`, aunque sólo toque un documento, cambia el sello y hace que todos los teléfonos bajen el código de nuevo. Si el sello se calcula sobre los archivos que se publican, un push que no toca la app no cambia nada. De paso: que el deploy selle y compruebe todas las páginas (`*.html`), no sólo `index.html` y `charla.html`. Lo tiene que subir quien tenga permiso para tocar workflows.
+  *Listo cuando:* un push que no toca la app deja `sw.js` publicado igual que estaba.
+
+Descartada: **dejar que la red de distribución del hosting guarde los `.js` y `.css`.** Ganaba 0,2 s por archivo en la primera visita, pero el hosting copia los archivos de a uno y su red no respeta el «sin caché»: si alguien pide un archivo justo durante una publicación, la versión vieja puede quedar guardada con la dirección nueva y servirse a todos por días. Con el cambio del service worker ya no hace falta.
 
 ## Sprint 2 — Que el inicio esté listo antes
 
@@ -105,7 +111,7 @@ Objetivo: tener medido lo que tarda en abrirse un chat con la app publicada, y q
 
 ## Sprint 5 — Que no se vuelva atrás
 
-- [ ] **Un presupuesto que la prueba haga cumplir.** Hoy `pruebas/rendimiento.js` sólo informa. Que falle si se pasa de: primera visita 220 kB; segunda visita 5 kB; inicio completo 2 s (primera) y 1 s (segunda); trabas 100 ms; saltos de pantalla, ninguno. Ajustar los topes a lo que quede después de los sprints 1 y 2.
+- [ ] **Un presupuesto que la prueba haga cumplir.** Hoy `pruebas/rendimiento.js` sólo informa. Que falle si se pasa de: primera visita 300 kB; segunda visita 5 kB; inicio completo 2 s (primera) y 1 s (segunda); trabas 100 ms; saltos de pantalla, ninguno. Ajustar los topes a lo que quede después de los sprints 1 y 2.
   *Listo cuando:* la prueba termina en rojo si un cambio rompe un tope.
 - [ ] **Correrla antes de publicar un cambio que toque la carga** y actualizar la tabla de «Dónde estamos».
   *Listo cuando:* está escrito en `CLAUDE.md`, junto a las otras pruebas.
@@ -118,6 +124,7 @@ Objetivo: tener medido lo que tarda en abrirse un chat con la app publicada, y q
 - [ ] Mavic y OSPEVIC tienen colores casi iguales y sus tarjetas se confunden. Es de la configuración de cada una en la plataforma.
 - [ ] En teléfonos chicos, los ocho botones de arranque del chat de SUVICO tapan parte del saludo. También es configuración de la plataforma.
 - [ ] Decidir cuándo se saca el «no indexar» (hoy la app queda fuera de Google a propósito).
+- [ ] Darle a la app un dominio o subdominio propio. Hoy comparte `web.temacy.com` con otros sitios en borrador, y para el navegador todos son el mismo sitio: comparten lo que se guarda en el teléfono (la copia sin conexión incluida).
 
 ---
 
