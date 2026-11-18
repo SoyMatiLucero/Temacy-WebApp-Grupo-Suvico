@@ -28,11 +28,16 @@ window.Comun = (function () {
   // Para comparar lo que escribe la persona con los temas: sin mayúsculas ni tildes.
   function norm(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
   function color(v) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v.trim()) ? v.trim() : ''; }
-  // Sólo https, una ruta de este mismo sitio o una imagen incrustada. Va a un <img>, nunca a HTML.
-  function logo(v) {
+  // Sólo https, una ruta del sitio de la plataforma o una imagen incrustada. Va a un <img>, nunca a
+  // HTML. La plataforma manda sus logos como ruta («/brands/…»): se completa con su sitio (`base`),
+  // que es de donde vino el chat de esa entidad.
+  function logo(v, base) {
     if (typeof v !== 'string') return '';
     var s = v.trim();
-    return /^(https:\/\/|\/(?!\/)|data:image\/(png|jpeg|webp|svg\+xml);)/i.test(s) && s.length < 300000 ? s : '';
+    if (s.length >= 300000) return '';
+    if (base && s.indexOf(base + '/') === 0) return s;      // ya venía completada con el sitio de la plataforma
+    if (!/^(https:\/\/|\/(?!\/)|data:image\/(png|jpeg|webp|svg\+xml);)/i.test(s)) return '';
+    return s.charAt(0) === '/' ? (base || '') + s : s;
   }
   function enlace(v) { var s = typeof v === 'string' ? v.trim() : ''; return /^https:\/\/[^\s"'<>]+$/i.test(s) && s.length < 500 ? s : ''; }
   // Blanco o tinta oscura, según cuál se lea mejor sobre el color de la entidad. 0.21 es donde el
@@ -55,6 +60,44 @@ window.Comun = (function () {
     var s = String(slug || '').toLowerCase(), hallada = null;
     G.entidades.forEach(function (e) { if (e.slug === s) hallada = e; });
     return hallada;
+  }
+
+  /* ── Dónde está el chat de cada entidad ────────────────────────────────────────────────────────
+   *
+   * Cada entidad tiene su script del chat, el que da la plataforma para pegar en un sitio:
+   *   <script src="https://…/widget.js" data-key="wk_…" async></script>
+   * En entidades.js están sus dos datos: `guion` (el src) y `clave` (el data-key). El chat le habla
+   * a la plataforma de donde vino su script, y la app le pide la configuración a ese mismo sitio.
+   *
+   * Dos casos en que NO se usa `guion` y el chat se pide a este mismo sitio (`/widget.js`):
+   *   · en una máquina de desarrollo (servidor-local.js), que se lo pasa a la API local: así se
+   *     prueba contra los bots de la base local y las pruebas no dejan conversaciones en producción;
+   *   · si la entidad no tiene `guion`: es para publicar la app detrás de un servidor que reenvíe a
+   *     la plataforma las rutas del chat (lo mismo que hace servidor-local.js).
+   */
+  var EN_DESARROLLO = /^(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/.test(location.hostname);
+  // De dónde se carga el chat de esta entidad.
+  function guionDe(ent) {
+    var s = !EN_DESARROLLO && typeof ent.guion === 'string' ? ent.guion.trim() : '';
+    return /^https?:\/\/[^\s"'<>\/]+\/widget\.js$/i.test(s) ? s : '/widget.js';
+  }
+  // El sitio de la plataforma de esta entidad. Vacío: es este mismo sitio.
+  function plataformaDe(ent) {
+    var g = guionDe(ent);
+    try { return g.charAt(0) === '/' ? '' : new URL(g).origin; } catch (e) { return ''; }
+  }
+  // La plataforma manda como RUTA lo que sirve ella misma (el logo «/brands/…», la foto del asesor,
+  // el aviso «/privacidad/…») y el chat lo usa tal cual: cargado desde otro sitio, se lo pediría al
+  // sitio de la app, que no lo tiene. Se completa con el sitio de la plataforma de esa entidad. Con
+  // el chat en este mismo sitio no cambia nada.
+  function completarConfig(ent, cruda) {
+    var base = plataformaDe(ent);
+    if (!base || !cruda || typeof cruda !== 'object') return cruda;
+    var completa = function (v) { return typeof v === 'string' && /^\/(?!\/)/.test(v) ? base + v : v; };
+    if (cruda.branding && typeof cruda.branding === 'object' && cruda.branding.logo) cruda.branding.logo = completa(cruda.branding.logo);
+    if (cruda.asesor && typeof cruda.asesor === 'object' && cruda.asesor.foto) cruda.asesor.foto = completa(cruda.asesor.foto);
+    if (cruda.privacidad_url) cruda.privacidad_url = completa(cruda.privacidad_url);
+    return cruda;
   }
 
   // Los botones de arranque que la entidad configuró en su chat («Mis haberes», «Autorizar un
@@ -85,11 +128,11 @@ window.Comun = (function () {
   var enCurso = {};
   var clave = function (ent) { return PRE + 'cfg_' + ent.slug; };
 
-  function resumir(cruda) {
+  function resumir(cruda, ent) {
     var b = (cruda && cruda.branding) || {};
     // El nombre, en el mismo orden que usa el chat para su encabezado: el del asesor si lo cargaron, si no el del bot.
     var nombre = (cruda && cruda.asesor && cruda.asesor.nombre) || (cruda && cruda.nombre);
-    return { bot: texto(nombre, 40), color: color(b.color), logo: logo(b.logo), intenciones: intenciones(cruda && cruda.intenciones) };
+    return { bot: texto(nombre, 40), color: color(b.color), logo: logo(b.logo, plataformaDe(ent)), intenciones: intenciones(cruda && cruda.intenciones) };
   }
   // Lo último que se supo de la configuración de una entidad: { cfg, no, fresca } o null.
   function configGuardada(ent) {
@@ -97,17 +140,17 @@ window.Comun = (function () {
     if (!g || typeof g !== 'object') return null;
     var edad = Date.now() - (Number(g.en) || 0);
     if (g.no) return { cfg: null, no: true, fresca: edad < FRESCA_NO_MS };
-    return g.cruda ? { cfg: resumir(g.cruda), no: false, fresca: edad < FRESCA_MS } : null;
+    return g.cruda ? { cfg: resumir(g.cruda, ent), no: false, fresca: edad < FRESCA_MS } : null;
   }
   // La configuración tal como vino, sólo si todavía está fresca. La usa el marco del chat.
   function configFresca(ent) {
     var g = leerJSON(clave(ent));
-    return g && !g.no && g.cruda && Date.now() - (Number(g.en) || 0) < FRESCA_MS ? g.cruda : null;
+    return g && !g.no && g.cruda && Date.now() - (Number(g.en) || 0) < FRESCA_MS ? completarConfig(ent, g.cruda) : null;
   }
   function recibirConfig(ent, cruda) {
-    var s = JSON.stringify({ en: Date.now(), cruda: cruda });
+    var s = JSON.stringify({ en: Date.now(), cruda: completarConfig(ent, cruda) });
     if (s.length <= MAX_GUARDAR) guardar(clave(ent), s);
-    return resumir(cruda);
+    return resumir(cruda, ent);
   }
   function marcarNoDisponible(ent) { guardar(clave(ent), JSON.stringify({ en: Date.now(), no: true })); }
 
@@ -122,7 +165,7 @@ window.Comun = (function () {
     if (g && g.fresca) return Promise.resolve(g.no ? { estado: 'no', cfg: null } : { estado: 'ok', cfg: g.cfg });
     if (enCurso[ent.slug]) return enCurso[ent.slug];
     var vieja = g && !g.no ? g.cfg : null;
-    var p = fetch('/api/web-chat/config?key=' + encodeURIComponent(ent.clave), { headers: { Accept: 'application/json' } })
+    var p = fetch(plataformaDe(ent) + '/api/web-chat/config?key=' + encodeURIComponent(ent.clave), { headers: { Accept: 'application/json' } })
       .then(function (r) {
         if (r.status === 400 || r.status === 403 || r.status === 404) { marcarNoDisponible(ent); return { estado: 'no', cfg: null }; }
         if (!r.ok) return { estado: 'sinred', cfg: vieja };
@@ -141,9 +184,9 @@ window.Comun = (function () {
   function hayConversacion(ent) { return !!leer('webchat_token_' + ent.clave); }
 
   return {
-    VERSION: VERSION, PRE: PRE, grupo: G, entidad: entidad, leer: leer, guardar: guardar, borrar: borrar, leerJSON: leerJSON,
+    VERSION: VERSION, PRE: PRE, grupo: G, entidad: entidad, guionDe: guionDe, plataformaDe: plataformaDe, leer: leer, guardar: guardar, borrar: borrar, leerJSON: leerJSON,
     texto: texto, norm: norm, huella: huella, tintaSobre: tintaSobre,
-    configGuardada: configGuardada, configFresca: configFresca, recibirConfig: recibirConfig,
+    configGuardada: configGuardada, configFresca: configFresca, recibirConfig: recibirConfig, completarConfig: completarConfig,
     marcarNoDisponible: marcarNoDisponible, pedirConfig: pedirConfig, hayConversacion: hayConversacion
   };
 }());

@@ -1,7 +1,18 @@
 /*
  * Las entidades del grupo, el nombre de la app y los temas del inicio. Es el único lugar donde se tocan.
  *
- * `clave` es la clave pública del chat web de cada entidad (la misma que ya figura en su página).
+ * `guion` y `clave` son el script del chat web de cada entidad, el que da la plataforma para pegar en
+ * un sitio (panel › ficha del cliente › Chat web):
+ *
+ *   <script src="https://app.temacy.ar/widget.js" data-key="wk_…" async></script>
+ *
+ * `guion` es su `src` y `clave` su `data-key`. La app no lo pega en la página: lo carga dentro del
+ * marco de cada chat (charla.js). El chat le habla a la plataforma de donde vino su script, así que
+ * no hace falta un servidor en el medio; lo que sí hace falta es que el dominio donde se publique
+ * la app esté cargado, en la plataforma, como sitio permitido del chat web de CADA entidad. Sin
+ * eso, la plataforma lo rechaza y la app muestra «no está disponible».
+ * En una máquina de desarrollo no se usa `guion`: ver comun.js («Dónde está el chat»).
+ *
  * El nombre del bot, el color, el logo y los botones de arranque NO van acá: los trae la
  * configuración del chat de cada entidad, así lo que la entidad cambia en la plataforma se ve acá
  * sin tocar este archivo. `color` es sólo el de reserva, para cuando esa configuración no llegó.
@@ -38,6 +49,7 @@ window.GRUPO = {
       nombre: 'SUVICO',
       que: 'El sindicato',
       temas: 'Sueldo, derechos laborales y servicios del sindicato.',
+      guion: 'https://app.temacy.ar/widget.js',
       clave: 'wk_suvico_7b3e2a9c14',
       color: '#DF040B',
       consultas: [
@@ -60,6 +72,7 @@ window.GRUPO = {
       nombre: 'Mavic',
       que: 'La mutual',
       temas: 'Cuota, sepelio, subsidios, cursos y beneficios.',
+      guion: 'https://app.temacy.ar/widget.js',
       clave: 'wk_af3f6d9ebe7f380d36519ded',
       color: '#30C0D8',
       consultas: [
@@ -87,6 +100,7 @@ window.GRUPO = {
       nombre: 'OSPEVIC',
       que: 'La obra social',
       temas: 'Órdenes, medicamentos, urgencias, centro médico y afiliación.',
+      guion: 'https://app.temacy.ar/widget.js',
       clave: 'wk_ospevic_7e08f0c3382f2f',
       color: '#10C0D0',
       // Lo que se habla con la obra social puede ser de salud: fuera del chat, la app no muestra

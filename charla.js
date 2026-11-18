@@ -4,7 +4,7 @@
  * entera del otro —cada marco es un documento aparte, con su propio chat de la plataforma adentro.
  *
  * Qué hace:
- *   · carga el chat (/widget.js) con la clave de la entidad y lo deja abierto ocupando el marco;
+ *   · carga el chat (el script de la entidad: su `guion` y su `clave`) y lo deja abierto ocupando el marco;
  *   · le cuenta a la app qué pasa (está listo, falló, qué hay en la conversación, se va a recargar);
  *   · hace lo que la app pide (mandar una consulta, tocar un botón de arranque, ponerse al día);
  *   · cuida que un chat que NO se está viendo no moleste: no toma el foco, no habla en voz alta y
@@ -148,6 +148,14 @@
       }
     } catch (e) { que = ''; }
     var promesa = fetchDeFabrica.apply(this, arguments);
+    // Con el chat cargado desde el sitio de la plataforma, a su configuración se le completan las
+    // rutas que la plataforma manda sin sitio (logo, aviso de privacidad): ver comun.js.
+    if (que === 'config' && C.plataformaDe(ent)) {
+      promesa = promesa.then(function (r) {
+        if (r.status !== 200) return r;
+        return r.clone().json().then(function (cruda) { return respuesta(200, JSON.stringify(C.completarConfig(ent, cruda))); }, function () { return r; });
+      });
+    }
     if (que) promesa.then(function (r) { mirar(que, r.status, r.clone()); }, function () { mirar(que, 0, null); });
     return promesa;
   };
@@ -239,7 +247,7 @@
   limite = setTimeout(function () { if (!listo && !cerrado) terminar('fallo', 'No pudimos abrir el chat.', true); }, 15000);
 
   var guion = document.createElement('script');
-  guion.src = '/widget.js';
+  guion.src = C.guionDe(ent);          // el script del chat de esta entidad (ver comun.js, «Dónde está el chat»)
   guion.async = true;
   guion.setAttribute('data-key', ent.clave);
   guion.onerror = function () { if (!listo) terminar('sinred', 'No pudimos cargar el chat. Revisá tu conexión.', true); };
