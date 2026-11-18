@@ -1,6 +1,6 @@
 # Web app del grupo — versión 1
 
-> Esta es la **v1**, tal como se entregó el 17-11-2026. Queda congelada, como referencia. La versión elegida es la v5 (`../../v5/`); las diferencias entre versiones están en `../LEEME.md`.
+> Esta es la **v1**, tal como se entregó el 17-11-2026. Queda congelada, como referencia. La versión elegida es la v5, que está en la raíz del repo; las diferencias entre versiones están en `../LEEME.md`.
 
 La puerta de entrada común a los chats de las tres entidades. El afiliado elige con quién hablar y se abre el chat de esa entidad. El plan completo (fases, decisiones y pendientes) está en `docs/plan_webapp.md`; esto es el paso 1.1.
 

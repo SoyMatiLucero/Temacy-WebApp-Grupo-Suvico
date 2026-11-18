@@ -1,14 +1,14 @@
-# Web app del grupo — versión 5, «neutra»
+# La app — era la versión 5, «neutra»
 
-**Es la versión elegida (18-11-2026): la app es esta carpeta.** Las otras cuatro quedaron en `../referencia/`, para consultarlas.
+**Es la versión elegida (18-11-2026).** Sus archivos están en la raíz del repo (`index.html`, `app.js` y los demás); hasta ese día vivían en la carpeta `v5/`, y por eso el nombre de su copia guardada (`grupo-v5`, en `sw.js`) y el número de `comun.js` (`VERSION = 5`) siguen diciendo 5. Las otras cuatro versiones quedaron en `../referencia/`, para consultarlas.
 
 La versión 3 sin el color de ninguna entidad. Nació el 18-11-2026: la v3 gustó, pero su inicio se veía como el sitio de Mavic (fondo azul de noche y turquesa), y una app de tres entidades no puede parecer de una. Se pidió conservar el contenido y lo moderno, y sacarle esa identidad.
 
 ## Qué cambia respecto de la v3
 
-Sólo la piel. El contenido, la disposición, las animaciones y el comportamiento son los de la v3: `app.js`, `movimiento.js`, `charla.js`, `entidades.js` y `charla.html` son idénticos byte a byte a los de `../referencia/v3/`. Las versiones de referencia ya no se mantienen: un arreglo va sólo acá.
+Sólo la piel. El contenido, la disposición, las animaciones y el comportamiento son los de la v3: `app.js`, `movimiento.js`, `charla.js`, `entidades.js` y `charla.html` son idénticos byte a byte a los de `../referencia/v3/`. Las versiones de referencia ya no se mantienen: un arreglo va sólo en la app.
 
-| | v3 | v5 |
+| | v3 | La app (v5) |
 |---|---|---|
 | Fondo | Azul de noche (`#051019`) con resplandor turquesa | Grafito (`#0b0d10`) con resplandor claro |
 | La luz (acento) | Turquesa | Blanca: botones, foco, pestaña elegida, aviso de «te contestaron» |
@@ -26,7 +26,7 @@ Todo lo demás: el movimiento y sus reglas, las tipografías (Cabinet Grotesk y 
 
 ## Probada
 
-- `pruebas/recorrido-delicado.js` contra la v5: todo en verde (18-11-2026).
+- `pruebas/recorrido-delicado.js`: todo en verde (18-11-2026, cuando todavía estaba en `v5/`; pasarla a la raíz no cambió su código).
 - Capturas en teléfono y escritorio: inicio, búsqueda, entrar a un chat, pasar de un chat a otro y volver; sin errores de consola ni pedidos rechazados.
 - No se probó en teléfonos reales.
 

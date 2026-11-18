@@ -22,13 +22,13 @@ Se entrega en tres pasos. Cada uno sirve por sí solo.
 
 ### Paso 1.1 — la app, sin login
 
-Se construyó en cinco versiones (17 y 18-11). **Elegida el 18-11: la v5**, que está en `v5/`. Las otras cuatro quedan en `referencia/` (`v1` a `v4`) para consultarlas; la comparación punto por punto está en `referencia/LEEME.md`.
+Se construyó en cinco versiones (17 y 18-11). **Elegida el 18-11: la v5**, que es la app y está en la raíz del repo. Las otras cuatro quedan en `referencia/` (`v1` a `v4`) para consultarlas; la comparación punto por punto está en `referencia/LEEME.md`.
 
 - **v1:** la pantalla «¿Con quién querés hablar?» con tres tarjetas; al elegir una se abre el chat de esa entidad. Usa el chat de la plataforma tal cual.
 - **v2:** una sola app con los tres chats vivos adentro. El inicio pregunta «¿Qué necesitás?» y deja buscar por tema o escribir la consulta y elegir a quién mandarla; pasar de una entidad a otra es un toque; avisa cuando contestan en una conversación que no se está mirando.
 
 - **v3 y v4:** la v2 funciona, pero no gustó cómo se ve (sobria y sin movimiento). Son la misma app por dentro con dos pieles nuevas y con animación: la **v3** toma el estilo del sitio de Mavic (de noche, turquesa) y la **v4** el de FitApp (verde bosque, lima y hueso). En las dos se ve una cosa por vez también en la computadora.
-- **v5 (18-11):** la v3 gustó, pero su inicio se veía como el sitio de Mavic y la app es de las tres entidades. La **v5** es la v3 con el mismo contenido y el mismo movimiento en una piel neutra: base grafito, luz blanca, y color sólo en lo que es de cada entidad (su tarjeta, su etiqueta, su logo, su chat). **Es la elegida** y está en `v5/`.
+- **v5 (18-11):** la v3 gustó, pero su inicio se veía como el sitio de Mavic y la app es de las tres entidades. La **v5** es la v3 con el mismo contenido y el mismo movimiento en una piel neutra: base grafito, luz blanca, y color sólo en lo que es de cada entidad (su tarjeta, su etiqueta, su logo, su chat). **Es la elegida**: sus archivos están en la raíz del repo.
 
 Estado: elegida la v5 (18-11). Anda en local y no está publicada. Falta probarla en teléfonos reales.
 
@@ -92,7 +92,7 @@ Por ejemplo, que Mavic vea un reclamo hecho en Ospevic. **No se toca todavía.**
 | Identidad verificada dentro del chat | No existe | — |
 | Guía pública entre entidades | No existe | — |
 | Pase con resumen | No existe (la v2 tiene el adelanto manual) | — |
-| La web app (paso 1.1) | Elegida la v5 (18-11), sin publicar | `v5/`; las otras cuatro, en `referencia/` |
+| La web app (paso 1.1) | Elegida la v5 (18-11), sin publicar | La raíz del repo; las otras cuatro, en `referencia/` |
 | App «Mi protección SUVICO» | Existe en App Store y Google Play y es otro producto (seguridad: mapa de hechos delictivos, alertas, herramientas para vigiladores). La publica un tercero, no es de la plataforma. Detalle abajo | Fichas públicas de las tiendas |
 
 ### La app que Suvico ya tiene en las tiendas
@@ -107,7 +107,7 @@ Relevada el 17-11-2026 leyendo las fichas públicas de App Store y Google Play, 
 
 ## 7. Paso 1.1 — cómo se hizo y cómo se probó
 
-Cómo está hecha cada versión: `referencia/v1/LEEME.md` y `referencia/v2/LEEME.md`; la elegida, en `v5/LEEME.md`.
+Cómo está hecha cada versión: `referencia/v1/LEEME.md` y `referencia/v2/LEEME.md`; la elegida, en `docs/la_app.md`.
 
 **Cómo se llegó a la v2.** Después de entregar la v1 se la revisó a fondo, de tres maneras: un estudio del chat de la plataforma tal como corre en producción (para saber hasta dónde se lo puede integrar sin modificarlo), una revisión de experiencia de uso con las capturas del recorrido, y una revisión de código. El veredicto de la revisión de experiencia sobre la v1: prolija como base técnica, pero «un directorio de tres links»: le pide al afiliado justo lo que no sabe (a cuál de las tres le toca su problema), cambiar de entidad recarga la página, y si le contestan más tarde no se entera.
 

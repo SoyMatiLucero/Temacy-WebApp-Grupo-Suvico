@@ -1,8 +1,8 @@
 # Versiones de referencia
 
-Las cuatro versiones que se hicieron antes de elegir. Quedan guardadas para consultarlas (cómo se resolvió algo, cómo se veía otra piel) y **no se mantienen**: un arreglo va sólo en `../v5/`.
+Las cuatro versiones que se hicieron antes de elegir. Quedan guardadas para consultarlas (cómo se resolvió algo, cómo se veía otra piel) y **no se mantienen**: un arreglo va sólo en la app.
 
-La que se eligió, el 18-11-2026, fue la quinta, la «neutra»: es la app y está en `../v5/`.
+La que se eligió, el 18-11-2026, fue la quinta (la v5, «neutra»): es la app, y sus archivos están en la raíz del repo.
 
 | Carpeta o archivo | Qué es |
 |---|---|
@@ -22,7 +22,7 @@ Desde la raíz del repo, con la API de la plataforma corriendo:
 API=http://127.0.0.1:3110 node servidor-local.js referencia
 ```
 
-v1 en `:4510`, v2 en `:4520`, v3 en `:4530`, v4 en `:4540`, la v5 en `:4550` y dos lado a lado en `:4505`. Más detalle en `../LEEME.md`.
+v1 en `:4510`, v2 en `:4520`, v3 en `:4530`, v4 en `:4540`, la app en `:4550` y dos lado a lado en `:4505`. Más detalle en `../LEEME.md`.
 
 ## Qué cambia de la v1 a la v2
 
@@ -69,7 +69,7 @@ Lo que suman de costo: tipografías propias (unos 100 KB en la v3 y 48 KB en la 
 
 ## De la v3 a la v5
 
-Sólo la piel: la v5 es la v3 con base grafito y luz blanca, y el color únicamente en lo que es de cada entidad. Está contado en `../v5/LEEME.md`.
+Sólo la piel: la v5 es la v3 con base grafito y luz blanca, y el color únicamente en lo que es de cada entidad. Está contado en `../docs/la_app.md`.
 
 ## Lo que la revisión encontró en la v1
 

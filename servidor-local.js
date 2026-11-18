@@ -1,13 +1,13 @@
 /*
  * Servidor para PROBAR la web app del grupo en esta máquina. No es parte de la app.
  *
- * La app es la v5 (carpeta v5/). Las versiones anteriores están en referencia/ (v1 a v4). Cada una
- * se levanta en su propio puerto —con su almacenamiento y su service worker, como si fueran sitios
- * distintos— y hay una página para verlas lado a lado:
+ * La app está en la raíz del repo (index.html y compañía; era la v5). Las versiones anteriores están
+ * en referencia/ (v1 a v4). Cada una se levanta en su propio puerto —con su almacenamiento y su
+ * service worker, como si fueran sitios distintos— y hay una página para verlas lado a lado:
  *
- *   node servidor-local.js                  → la app (v5) en :4550
+ *   node servidor-local.js                  → la app en :4550
  *   node servidor-local.js referencia       → además v1 en :4510 … v4 en :4540 · lado a lado en :4505
- *   node servidor-local.js v3 v5            → sólo esas versiones
+ *   node servidor-local.js v3               → la app y sólo esa de referencia · lado a lado en :4505
  *   API=http://127.0.0.1:3110 node …        → otra API (por defecto http://127.0.0.1:3100)
  *   RED=1 node …                            → escucha también en la red local, para abrirla desde un
  *                                             teléfono (ahí no hay modo sin conexión ni micrófono:
@@ -33,10 +33,14 @@ const API = new URL(process.env.API || 'http://127.0.0.1:3100');
 const ESCUCHA = process.env.RED === '1' ? '0.0.0.0' : '127.0.0.1';
 const BASE = __dirname;
 const REFERENCIA = path.join(BASE, 'referencia');
-const LA_APP = 'v5';              // la versión elegida (18-11-2026): está en la raíz; las demás, en referencia/
+const LA_APP = 'app';             // la versión elegida (18-11-2026, era la v5): sus archivos están en la raíz del repo
+const PUERTO_APP = 4550;          // el que tenía cuando era la v5: en esta máquina conserva lo guardado
 const PUERTO_COMPARADOR = 4505;
-const puertoDe = (version) => 4500 + 10 * Number(version.slice(1));   // v1 → 4510, v2 → 4520…
-const carpetaDe = (version) => path.join(version === LA_APP ? BASE : REFERENCIA, version);
+const puertoDe = (version) => (version === LA_APP ? PUERTO_APP : 4500 + 10 * Number(version.slice(1)));   // v1 → 4510, v2 → 4520…
+const carpetaDe = (version) => (version === LA_APP ? BASE : path.join(REFERENCIA, version));
+// La app comparte la raíz con cosas que no son de ella (los documentos, las pruebas, las versiones
+// de referencia, este archivo). Por el puerto de la app no se sirven: tampoco se publican.
+const FUERA_DE_LA_APP = /^(referencia|pruebas|docs)\/|^servidor-local\.js$|(^|\/)\./i;
 
 // SÓLO lo que el chat necesita, que es lo mismo que tiene que hacer el servidor que la publique
 // (ver LEEME.md). El resto de la API de la plataforma no se expone en este dominio: si el chat
@@ -77,10 +81,12 @@ const vaALaPlataforma = (ruta) => A_LA_PLATAFORMA.some((re) => re.test(ruta));
 // El archivo que corresponde a una ruta, o null si no existe o cae fuera de la carpeta. Se compara
 // contra la carpeta CON su separador: comparar el prefijo pelado dejaba pasar a una carpeta hermana
 // que empezara igual (…/v1 y …/v10).
-function archivoDe(raiz, ruta) {
+function archivoDe(raiz, ruta, vedado) {
   if (ruta == null || ruta.includes('\0')) return null;
   const real = path.resolve(raiz, '.' + (ruta.endsWith('/') ? ruta + 'index.html' : ruta));
   if (!real.startsWith(raiz + path.sep) || !TIPOS[path.extname(real)]) return null;
+  // Se decide sobre el archivo ya resuelto, no sobre la dirección como llegó (que puede traer `..`).
+  if (vedado && vedado.test(path.relative(raiz, real).split(path.sep).join('/'))) return null;
   return real;
 }
 
@@ -116,7 +122,7 @@ function levantarVersion(version) {
     if (ruta && vaALaApi(ruta)) return aLaApi(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
     if (ruta && vaALaPlataforma(ruta)) { res.writeHead(302, { Location: plataforma(req) + req.url }); return res.end(); }
-    servirArchivo(archivoDe(raiz, ruta), res);
+    servirArchivo(archivoDe(raiz, ruta, version === LA_APP ? FUERA_DE_LA_APP : null), res);
   });
   // El chat recibe los mensajes por WebSocket (/socket.io/): se pasa la conexión tal cual.
   servidor.on('upgrade', (req, socket, cabeza) => {
@@ -150,14 +156,17 @@ function levantarComparador(versiones) {
 }
 
 const hay = (v) => fs.existsSync(path.join(carpetaDe(v), 'index.html'));
-const deReferencia = fs.existsSync(REFERENCIA) ? fs.readdirSync(REFERENCIA).filter((d) => /^v\d+$/.test(d) && d !== LA_APP && hay(d)) : [];
-const todas = deReferencia.concat(hay(LA_APP) ? [LA_APP] : []).sort();
-// Sin argumentos, sólo la app. Con `referencia`, todas. Con nombres de versión, esas.
+const deReferencia = fs.existsSync(REFERENCIA) ? fs.readdirSync(REFERENCIA).filter((d) => /^v\d+$/.test(d) && hay(d)).sort() : [];
+if (!hay(LA_APP)) { console.error('No está la app: falta index.html en la raíz del repo.'); process.exit(1); }
+// La app se levanta siempre. Con `referencia`, además todas las de referencia; con nombres (v3), esas.
 const pedidas = process.argv.slice(2);
-const versiones = !pedidas.length ? todas.filter((v) => v === LA_APP)
-  : pedidas.includes('referencia') ? todas
-  : todas.filter((v) => pedidas.includes(v));
-if (!versiones.length) { console.error('No hay ninguna versión para levantar. Están: ' + (todas.join(', ') || 'ninguna')); process.exit(1); }
+const desconocidas = pedidas.filter((p) => p !== 'referencia' && !deReferencia.includes(p));
+if (desconocidas.length) {
+  console.error(`No conozco «${desconocidas.join('», «')}». Se puede pedir: referencia (todas)` + (deReferencia.length ? ', ' + deReferencia.join(', ') : ''));
+  process.exit(1);
+}
+// La app va última: el comparador arranca mostrando las dos últimas de la lista.
+const versiones = (pedidas.includes('referencia') ? deReferencia : deReferencia.filter((v) => pedidas.includes(v))).concat(LA_APP);
 
 console.log(`Web app del grupo  (API: ${API.origin})`);
 versiones.forEach(levantarVersion);
